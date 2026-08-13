@@ -1,5 +1,6 @@
 """AI lab blog RSS fetchers — Western labs and Chinese labs via HuggingFace org API."""
 
+import concurrent.futures
 import feedparser
 import requests
 
@@ -97,7 +98,7 @@ def _fetch_model_detail(model_id: str) -> dict:
 
 def _fetch_hf_org_releases(org_list: list[tuple], source_tag: str) -> list[dict]:
     """Generic fetcher for recent HuggingFace org model/dataset releases."""
-    results = []
+    org_models: list[tuple[str, dict]] = []
     for lab_name, org_id in org_list:
         try:
             resp = _session.get(
@@ -112,29 +113,47 @@ def _fetch_hf_org_releases(org_list: list[tuple], source_tag: str) -> list[dict]
             )
             resp.raise_for_status()
             for model in resp.json():
-                model_id = model.get("modelId", "")
-                tags = model.get("tags", [])
-                detail = _fetch_model_detail(model_id)
-                license_info = detail["license"]
-                param_size = detail["param_size"]
-
-                meta_parts = [f"Tags: {', '.join(tags[:12])}"]
-                if license_info:
-                    meta_parts.append(f"License: {license_info}")
-                if param_size:
-                    meta_parts.append(f"Size: {param_size}")
-
-                results.append({
-                    "source": f"{lab_name} ({source_tag})",
-                    "title": f"Model release: {model_id}",
-                    "url": f"https://huggingface.co/{model_id}",
-                    "summary": " | ".join(meta_parts),
-                    "date": model.get("lastModified", ""),
-                    "license": license_info,
-                    "param_size": param_size,
-                })
+                org_models.append((lab_name, model))
         except Exception:
             continue
+
+    if not org_models:
+        return []
+
+    # Per-model license/param-size detail calls (up to 5 per org × N orgs)
+    # were previously sequential — fetch them concurrently instead.
+    details: dict[int, dict] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_idx = {
+            executor.submit(_fetch_model_detail, model.get("modelId", "")): i
+            for i, (_, model) in enumerate(org_models)
+        }
+        for future in concurrent.futures.as_completed(future_to_idx):
+            details[future_to_idx[future]] = future.result()
+
+    results = []
+    for i, (lab_name, model) in enumerate(org_models):
+        model_id = model.get("modelId", "")
+        tags = model.get("tags", [])
+        detail = details.get(i, {"license": "", "param_size": ""})
+        license_info = detail["license"]
+        param_size = detail["param_size"]
+
+        meta_parts = [f"Tags: {', '.join(tags[:12])}"]
+        if license_info:
+            meta_parts.append(f"License: {license_info}")
+        if param_size:
+            meta_parts.append(f"Size: {param_size}")
+
+        results.append({
+            "source": f"{lab_name} ({source_tag})",
+            "title": f"Model release: {model_id}",
+            "url": f"https://huggingface.co/{model_id}",
+            "summary": " | ".join(meta_parts),
+            "date": model.get("lastModified", ""),
+            "license": license_info,
+            "param_size": param_size,
+        })
     return results
 
 
