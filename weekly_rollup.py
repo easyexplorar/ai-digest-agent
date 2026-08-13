@@ -4,6 +4,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from google import genai
 
+from gemini_utils import generate_content_with_retry
+
 
 WEEKLY_PROMPT = """You are a senior AI research strategist writing a weekly intelligence report for a practitioner who monitors AI and agentic system trends.
 
@@ -114,7 +116,8 @@ def generate_weekly_rollup(api_key: str, output_dir: str = "output") -> str:
         week_start=week_start,
         jobs_text=jobs_text,
     )
-    response = client.models.generate_content(
+    response = generate_content_with_retry(
+        client,
         model="gemini-2.5-flash",
         contents=prompt,
     )

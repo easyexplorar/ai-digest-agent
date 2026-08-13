@@ -2,6 +2,8 @@
 
 from google import genai
 
+from gemini_utils import generate_content_with_retry
+
 
 DIGEST_PROMPT = """You are writing a daily AI briefing for a smart, curious business reader who is NOT a programmer or academic. They care about what's happening in AI and what it means for the world — but they switch off the moment they see jargon.
 
@@ -104,6 +106,17 @@ If nothing notable today, write: Nothing notable from Chinese labs today.
 - **[Lab or company name]:** [What they did, in plain language.] [Global relevance if any.]
 
 
+## Market Signals
+
+How the public markets are reacting to AI right now, for a reader who wants the business angle, not a stock tip.
+
+2–3 plain sentences on what today's price moves and analyst sentiment across major AI-exposed companies suggest about investor confidence in AI right now. Call out any stock with a notably large move or an upcoming earnings date and connect it to today's AI news if there's a plausible link. If the data looks flat or unremarkable, say so plainly rather than inventing significance.
+If market data is unavailable, write: Market data unavailable today.
+
+Use this data:
+{market_context}
+
+
 ## The Big Picture
 
 2–3 plain sentences. Step back from today's news: what direction is AI heading based on these signals? What should a non-technical reader take away for the week ahead? No jargon. No buzzwords.
@@ -121,6 +134,7 @@ def generate_digest(
     top_n: int = 10,
     discipline_tally: str = "",
     trend_delta: str = "",
+    market_context: str = "",
 ) -> str:
     """Generate a markdown digest from the top N ranked items."""
     client = genai.Client(api_key=api_key)
@@ -140,8 +154,10 @@ def generate_digest(
         items_text=items_text,
         discipline_tally=discipline_tally or "No tally available.",
         trend_delta=trend_delta or "No prior day data available (first run).",
+        market_context=market_context or "Market data unavailable.",
     )
-    response = client.models.generate_content(
+    response = generate_content_with_retry(
+        client,
         model="gemini-2.5-flash",
         contents=prompt,
     )

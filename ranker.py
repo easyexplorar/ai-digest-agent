@@ -1,9 +1,14 @@
 """Uses Gemini to score and rank fetched items by novelty and relevance."""
 
 import json
+import logging
 import re
 from google import genai
 from google.genai import types
+
+from gemini_utils import generate_content_with_retry
+
+logger = logging.getLogger("ai_digest")
 
 CHUNK_SIZE = 40  # items per Gemini call — keeps responses clean and avoids JSON truncation
 
@@ -84,7 +89,8 @@ def _rank_chunk(client, items_chunk: list[dict], offset: int) -> tuple[dict, dic
         for i, item in enumerate(items_chunk)
     )
     prompt = RANKING_PROMPT.format(items_text=items_text)
-    response = client.models.generate_content(
+    response = generate_content_with_retry(
+        client,
         model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
@@ -115,6 +121,7 @@ def rank_items(items: list[dict], api_key: str) -> list[dict]:
             discipline_map.update(dm)
         except Exception as e:
             print(f"    [warning] ranking chunk {chunk_idx + 1}/{len(chunks)} failed: {e}")
+            logger.warning(f"ranking chunk {chunk_idx + 1}/{len(chunks)} failed after retries: {e}")
 
     for i, item in enumerate(items):
         item["score"]      = score_map.get(i, 0)
