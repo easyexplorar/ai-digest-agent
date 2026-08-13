@@ -171,8 +171,12 @@ def send_email(
     pdf_bytes = pdf_path.read_bytes()
 
     ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+    if smtp_host in ("127.0.0.1", "localhost", "::1"):
+        # Local bridges (e.g. Proton Mail Bridge) use a self-signed cert that
+        # can't be verified — safe to skip only because the connection never
+        # leaves the machine. Any real remote host still gets full verification.
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
     with smtplib.SMTP(smtp_host, smtp_port) as server:
         server.starttls(context=ctx)
         server.login(smtp_user, smtp_pass)
