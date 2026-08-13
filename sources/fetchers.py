@@ -4,6 +4,8 @@ import feedparser
 import requests
 from datetime import datetime, timezone, timedelta
 
+from dedup_utils import normalize_title
+
 
 def _is_recent(date_str: str, days: int = 2) -> bool:
     """Return True if the parsed date is within the last N days."""
@@ -132,13 +134,14 @@ def fetch_github_trending() -> list[dict]:
 
 
 def _dedup(items: list[dict]) -> list[dict]:
-    """Remove duplicates by exact URL, then by 70-char lowercased title prefix."""
+    """Remove duplicates by exact URL, then by full normalized title
+    (not a truncated prefix — see dedup_utils for why)."""
     seen_urls: set[str] = set()
     seen_titles: set[str] = set()
     result = []
     for item in items:
         url = item.get("url", "").strip()
-        title_key = item.get("title", "").lower()[:70]
+        title_key = normalize_title(item.get("title", ""))
         if url and url in seen_urls:
             continue
         if title_key and title_key in seen_titles:

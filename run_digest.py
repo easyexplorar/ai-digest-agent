@@ -23,7 +23,7 @@ from sources.market_data import fetch_market_data, format_market_context
 from ranker import rank_items
 from digest import generate_digest
 from tracker import (
-    save_snapshot, load_yesterday, load_seen_urls,
+    save_snapshot, save_seen_urls, load_yesterday, load_seen_urls,
     discipline_tally, trend_delta,
     format_tally_text, format_delta_text,
 )
@@ -54,6 +54,10 @@ def main():
         console.print("[yellow]No items fetched. Check your internet connection.[/yellow]")
         logger.warning("No items fetched — ending run early.")
         sys.exit(0)
+
+    # Log every fetched URL today (not just whatever makes today's top-30
+    # snapshot) so tomorrow's seen-URL filter has full coverage.
+    save_seen_urls(items)
 
     # ── Filter already-seen items ──────────────────────────────────────────
     seen_urls = load_seen_urls()
