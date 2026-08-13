@@ -1,6 +1,7 @@
 """Convert markdown digest to PDF and send via email."""
 
 import base64
+import os
 import smtplib
 import ssl
 import tempfile
@@ -10,7 +11,17 @@ from pathlib import Path
 import markdown
 from xhtml2pdf import pisa
 
-LOGO_PATH = Path(r"REDACTED_LOGO_PATH")
+# Optional — falls back to a text "REDACTED_BRAND" wordmark (see _logo_html) if unset
+# or the file doesn't exist, so this is safe to leave unset on other machines.
+# Read lazily (not at import time): callers like run_digest.py import this
+# module before load_dotenv() runs, so an eager os.getenv() here would miss
+# a LOGO_PATH set only in .env.
+_DEFAULT_LOGO_PATH = r"REDACTED_LOGO_PATH"
+
+
+def _logo_path() -> Path:
+    return Path(os.getenv("LOGO_PATH", _DEFAULT_LOGO_PATH))
+
 
 DISCLAIMER = (
     "Confidential — REDACTED_BRAND internal only. "
@@ -84,11 +95,12 @@ _LOGO_TARGET_HEIGHT_PX = 360  # 60pt (~120px at 144dpi) × 3× for crisp PDF ren
 
 
 def _logo_html() -> str:
-    if LOGO_PATH.exists():
+    logo_path = _logo_path()
+    if logo_path.exists():
         try:
             import io
             from PIL import Image
-            img = Image.open(LOGO_PATH).convert("RGBA")
+            img = Image.open(logo_path).convert("RGBA")
             ratio = _LOGO_TARGET_HEIGHT_PX / img.height
             new_w = max(1, int(img.width * ratio))
             img = img.resize((new_w, _LOGO_TARGET_HEIGHT_PX), Image.LANCZOS)
@@ -96,7 +108,7 @@ def _logo_html() -> str:
             img.save(buf, format="PNG", optimize=True)
             data = base64.b64encode(buf.getvalue()).decode()
         except Exception:
-            data = base64.b64encode(LOGO_PATH.read_bytes()).decode()
+            data = base64.b64encode(logo_path.read_bytes()).decode()
         uri = f"data:image/png;base64,{data}"
         return f'<td class="logo-cell"><img src="{uri}" /></td>'
     return '<td class="logo-cell"><span class="logo-text">REDACTED_BRAND</span></td>'
