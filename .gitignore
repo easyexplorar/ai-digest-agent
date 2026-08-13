@@ -1,0 +1,16 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Generated output (grows unbounded, not source)
+output/
+logs/
+
+# Claude Code local settings
+.claude/settings.local.json
