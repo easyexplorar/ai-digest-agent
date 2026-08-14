@@ -14,6 +14,12 @@ HN_KEYWORDS = [
     "fine-tuning", "LoRA", "local LLM", "edge AI", "quantization",
     "AI alignment", "prompt injection", "agent security",
     "embodied AI", "humanoid robot", "voice AI", "DeepSeek", "Qwen",
+    # Frontier-lab founders (OpenAI/Google/Meta alumni now running their own
+    # labs) — most of these labs have no blog/RSS feed of their own yet, so
+    # HN discussion is the main way their news gets caught at all.
+    "Safe Superintelligence", "Ilya Sutskever", "AMI Labs", "Yann LeCun",
+    "Discovery Loop", "Jeff Dean", "Thinking Machines Lab", "Mira Murati",
+    "Andrew Ng", "DeepLearning.AI",
 ]
 
 HEADERS = {"User-Agent": "AI-Digest-Agent/1.0 (research digest tool)"}

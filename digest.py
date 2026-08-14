@@ -111,6 +111,23 @@ didn't make the overall top 10):
 - **[Lab or company name]:** [What they did, in plain language.] [Global relevance if any.]
 
 
+## Frontier Voices
+
+What the founders of the newest frontier AI labs — people who left OpenAI,
+Google, or Meta to start their own — published, shipped, or said today:
+Ilya Sutskever (Safe Superintelligence), Yann LeCun (AMI Labs), Jeff Dean
+(Discovery Loop), Andrew Ng (DeepLearning.AI), Mira Murati (Thinking
+Machines Lab). Plain English — who they are and why their move matters,
+not just what the post says.
+If the data below says none were detected, write: Nothing notable from frontier lab founders today.
+
+Use this data (pulled separately from the whole day's ranked items, not
+just the Top Stories above):
+{frontier_context}
+
+- **[Person — Lab name]:** [What they did or said, in plain language.] [Why it matters, given who they are.]
+
+
 ## Market Signals
 
 How the public markets are reacting to AI right now, for a reader who wants the business angle, not a stock tip.
@@ -141,6 +158,7 @@ def generate_digest(
     trend_delta: str = "",
     market_context: str = "",
     china_context: str = "",
+    frontier_context: str = "",
 ) -> str:
     """Generate a markdown digest from the top N ranked items."""
     client = genai.Client(api_key=api_key)
@@ -162,6 +180,7 @@ def generate_digest(
         trend_delta=trend_delta or "No prior day data available (first run).",
         market_context=market_context or "Market data unavailable.",
         china_context=china_context or "No Chinese lab or robotics items detected today.",
+        frontier_context=frontier_context or "No frontier-lab-founder items detected today.",
     )
     response = generate_content_with_retry(
         client,

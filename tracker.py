@@ -129,3 +129,19 @@ def format_china_context(ranked_items: list[dict], top_n: int = 5) -> str:
         f"- [{i['source']}] {i['title']} — {i.get('reason', '')} ({i['url']})"
         for i in china_items
     )
+
+
+def format_frontier_context(ranked_items: list[dict], top_n: int = 5) -> str:
+    """Build a dedicated text block of items tagged by
+    frontier_voices.tag_frontier_voices (Sutskever/SSI, LeCun/AMI Labs,
+    Dean/Discovery Loop, Ng/DeepLearning.AI, Murati/Thinking Machines Lab)
+    for the digest's Frontier Voices section. Pulled from the *full* ranked
+    list, same reasoning as format_china_context: these items would
+    otherwise only surface if they happened to make the overall top 10."""
+    frontier_items = [i for i in ranked_items if i.get("frontier_voice")][:top_n]
+    if not frontier_items:
+        return "No frontier-lab-founder items detected today."
+    return "\n".join(
+        f"- [{i['frontier_voice']}] {i['title']} — {i.get('reason', '')} ({i['url']})"
+        for i in frontier_items
+    )

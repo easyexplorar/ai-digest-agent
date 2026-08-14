@@ -25,8 +25,9 @@ from digest import generate_digest
 from tracker import (
     save_snapshot, save_seen_urls, load_yesterday, load_seen_urls,
     discipline_tally, trend_delta,
-    format_tally_text, format_delta_text, format_china_context,
+    format_tally_text, format_delta_text, format_china_context, format_frontier_context,
 )
+from frontier_voices import tag_frontier_voices
 from notify import save_digest, send_windows_notification
 from weekly_rollup import is_friday, generate_weekly_rollup
 from email_sender import send_digest_email, send_rollup_email
@@ -49,6 +50,7 @@ def main():
     # ── Fetch ──────────────────────────────────────────────────────────────
     console.print("[bold cyan]AI Digest Agent[/bold cyan] — fetching sources...")
     items = fetch_all()
+    tag_frontier_voices(items)
     console.print(f"\n  Total: [bold]{len(items)}[/bold] items fetched across all sources.")
     logger.info(f"Fetched {len(items)} items across all sources.")
 
@@ -87,6 +89,7 @@ def main():
     console.print(f"  New today: {len(delta['new'])} | Recurring: {len(delta['recurring'])}")
 
     china_txt = format_china_context(ranked)
+    frontier_txt = format_frontier_context(ranked)
 
     # ── Market signals ─────────────────────────────────────────────────────
     console.print("  Fetching market data...")
@@ -105,6 +108,7 @@ def main():
         trend_delta=delta_txt,
         market_context=market_txt,
         china_context=china_txt,
+        frontier_context=frontier_txt,
     )
     logger.info("Digest generated.")
 

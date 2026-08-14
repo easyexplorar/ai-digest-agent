@@ -5,7 +5,7 @@ from tracker import (
     save_snapshot, load_snapshot, load_yesterday,
     save_seen_urls, load_seen_urls,
     discipline_tally, trend_delta,
-    format_tally_text, format_delta_text, format_china_context,
+    format_tally_text, format_delta_text, format_china_context, format_frontier_context,
 )
 
 
@@ -145,4 +145,35 @@ def test_format_china_context_caps_at_top_n():
         for i in range(8)
     ]
     text = format_china_context(ranked, top_n=3)
+    assert text.count("Item") == 3
+
+
+def test_format_frontier_context_uses_tagged_items_regardless_of_rank():
+    ranked = [
+        {"title": "Top agent paper", "source": "arXiv", "url": "https://x/1",
+         "score": 29, "discipline": "Agent Security", "reason": "r"},
+        {"title": "SSI shares update", "source": "Hacker News", "url": "https://x/2",
+         "score": 11, "discipline": "Model Release", "reason": "stealth lab news",
+         "frontier_voice": "Safe Superintelligence (Ilya Sutskever)"},
+    ]
+    text = format_frontier_context(ranked)
+    assert "SSI shares update" in text
+    assert "Safe Superintelligence (Ilya Sutskever)" in text
+    assert "Top agent paper" not in text
+
+
+def test_format_frontier_context_empty_when_nothing_tagged():
+    ranked = [{"title": "Other", "source": "arXiv", "url": "https://x",
+               "score": 20, "discipline": "Model Release", "reason": ""}]
+    assert format_frontier_context(ranked) == "No frontier-lab-founder items detected today."
+
+
+def test_format_frontier_context_caps_at_top_n():
+    ranked = [
+        {"title": f"Item {i}", "source": "Thinking Machines Lab Blog", "url": f"https://x/{i}",
+         "score": 10, "discipline": "Model Release", "reason": "",
+         "frontier_voice": "Thinking Machines Lab (Mira Murati)"}
+        for i in range(8)
+    ]
+    text = format_frontier_context(ranked, top_n=3)
     assert text.count("Item") == 3

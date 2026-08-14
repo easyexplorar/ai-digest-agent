@@ -25,6 +25,10 @@ WESTERN_LAB_FEEDS = [
     # directly relevant to this digest's AI-native-software-engineering
     # and agent-framework coverage.
     ("Claude Code (Anthropic)", "https://github.com/anthropics/claude-code/releases.atom"),
+    # Mira Murati's post-OpenAI lab — one of the few "frontier founder"
+    # startups with an actual working blog feed (verified live; Safe
+    # Superintelligence, AMI Labs, and Discovery Loop have none).
+    ("Thinking Machines Lab", "https://thinkingmachines.ai/index.xml"),
 ]
 
 # Chinese labs tracked via their HuggingFace organisation model releases
