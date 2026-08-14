@@ -1,8 +1,9 @@
 """AI lab blog RSS fetchers — Western labs and Chinese labs via HuggingFace org API."""
 
 import concurrent.futures
-import feedparser
 import requests
+
+from sources.http_utils import get_with_retry, parse_feed_with_retry
 
 HEADERS = {"User-Agent": "AI-Digest-Agent/1.0 (research digest tool)"}
 _session = requests.Session()
@@ -46,7 +47,7 @@ def fetch_lab_blogs() -> list[dict]:
     results = []
     for lab_name, feed_url in WESTERN_LAB_FEEDS:
         try:
-            feed = feedparser.parse(feed_url, request_headers=HEADERS)
+            feed = parse_feed_with_retry(feed_url, request_headers=HEADERS)
             for entry in feed.entries[:3]:
                 results.append({
                     "source": f"{lab_name} Blog",
@@ -80,11 +81,11 @@ def _format_param_count(safetensors: dict | None) -> str:
 def _fetch_model_detail(model_id: str) -> dict:
     """Fetch license and parameter size from the individual model endpoint."""
     try:
-        resp = _session.get(
+        resp = get_with_retry(
             f"https://huggingface.co/api/models/{model_id}",
+            session=_session,
             timeout=8,
         )
-        resp.raise_for_status()
         data = resp.json()
         card = data.get("cardData") or {}
         license_info = card.get("license", "")
@@ -101,8 +102,9 @@ def _fetch_hf_org_releases(org_list: list[tuple], source_tag: str) -> list[dict]
     org_models: list[tuple[str, dict]] = []
     for lab_name, org_id in org_list:
         try:
-            resp = _session.get(
+            resp = get_with_retry(
                 "https://huggingface.co/api/models",
+                session=_session,
                 params={
                     "author": org_id,
                     "sort": "lastModified",
@@ -111,7 +113,6 @@ def _fetch_hf_org_releases(org_list: list[tuple], source_tag: str) -> list[dict]
                 },
                 timeout=10,
             )
-            resp.raise_for_status()
             for model in resp.json():
                 org_models.append((lab_name, model))
         except Exception:

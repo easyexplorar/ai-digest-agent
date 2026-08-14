@@ -1,10 +1,9 @@
 """Fetchers for each data source."""
 
-import feedparser
-import requests
 from datetime import datetime, timezone, timedelta
 
 from dedup_utils import normalize_title
+from sources.http_utils import get_with_retry, parse_feed_with_retry
 
 
 def _is_recent(date_str: str, days: int = 2) -> bool:
@@ -37,7 +36,7 @@ def fetch_arxiv(max_results: int = 25) -> list[dict]:
         f"&sortBy=submittedDate&sortOrder=descending"
         f"&max_results={max_results}"
     )
-    feed = feedparser.parse(url)
+    feed = parse_feed_with_retry(url)
     results = []
     for entry in feed.entries:
         results.append({
@@ -66,7 +65,7 @@ def fetch_arxiv_robotics(max_results: int = 15) -> list[dict]:
         f"&sortBy=submittedDate&sortOrder=descending"
         f"&max_results={max_results}"
     )
-    feed = feedparser.parse(url)
+    feed = parse_feed_with_retry(url)
     results = []
     for entry in feed.entries:
         results.append({
@@ -82,11 +81,7 @@ def fetch_arxiv_robotics(max_results: int = 15) -> list[dict]:
 def fetch_huggingface_papers() -> list[dict]:
     """Fetch daily papers from Hugging Face via the daily_papers API."""
     try:
-        resp = requests.get(
-            "https://huggingface.co/api/daily_papers",
-            timeout=10,
-        )
-        resp.raise_for_status()
+        resp = get_with_retry("https://huggingface.co/api/daily_papers", timeout=10)
     except Exception:
         return []
 
@@ -107,7 +102,7 @@ def fetch_huggingface_papers() -> list[dict]:
 
 def fetch_github_trending() -> list[dict]:
     """Fetch trending AI/ML repos from GitHub via scraping-free RSS alternative."""
-    feed = feedparser.parse("https://mshibanami.github.io/GitHubTrendingRSS/daily/python.xml")
+    feed = parse_feed_with_retry("https://mshibanami.github.io/GitHubTrendingRSS/daily/python.xml")
     ai_keywords = {
         "llm", "agent", "rag", "transformer", "diffusion", "gpt", "claude",
         "gemini", "mistral", "vision", "embedding", "fine-tun", "instruct",

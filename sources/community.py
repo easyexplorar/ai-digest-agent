@@ -3,7 +3,8 @@
 import concurrent.futures
 import time
 import requests
-import feedparser
+
+from sources.http_utils import get_with_retry, parse_feed_with_retry
 
 
 HN_KEYWORDS = [
@@ -30,7 +31,7 @@ def fetch_alignment_forum() -> list[dict]:
     results = []
     for source_name, feed_url in ALIGNMENT_FEEDS:
         try:
-            feed = feedparser.parse(feed_url, request_headers=HEADERS)
+            feed = parse_feed_with_retry(feed_url, request_headers=HEADERS)
             for entry in feed.entries[:5]:
                 results.append({
                     "source": source_name,
@@ -49,8 +50,9 @@ def _search_hn_keyword(kw: str, cutoff: int) -> list[tuple[dict, int]]:
     sort by points without re-parsing it back out of the summary text."""
     out = []
     try:
-        resp = _session.get(
+        resp = get_with_retry(
             "https://hn.algolia.com/api/v1/search_by_date",
+            session=_session,
             params={
                 "query": kw,
                 "tags": "story",
@@ -59,7 +61,6 @@ def _search_hn_keyword(kw: str, cutoff: int) -> list[tuple[dict, int]]:
             },
             timeout=10,
         )
-        resp.raise_for_status()
         for hit in resp.json().get("hits", []):
             points = hit.get("points", 0) or 0
             if points < 5:

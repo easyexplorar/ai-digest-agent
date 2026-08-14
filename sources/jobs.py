@@ -1,7 +1,8 @@
 """AI industry job posting fetcher using Greenhouse and Lever public APIs."""
 
-import requests
 from datetime import datetime, timezone, timedelta
+
+from sources.http_utils import get_with_retry
 
 HEADERS = {"User-Agent": "AI-Digest-Agent/1.0 (research digest tool)"}
 
@@ -44,13 +45,12 @@ def _is_ai_role(title: str) -> bool:
 
 def _fetch_greenhouse(slug: str, company: str) -> list[dict]:
     try:
-        resp = requests.get(
+        resp = get_with_retry(
             f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs",
             params={"content": "false"},
             headers=HEADERS,
             timeout=10,
         )
-        resp.raise_for_status()
         jobs = []
         for j in resp.json().get("jobs", []):
             title = j.get("title", "")
@@ -79,13 +79,12 @@ def _fetch_greenhouse(slug: str, company: str) -> list[dict]:
 
 def _fetch_lever(slug: str, company: str) -> list[dict]:
     try:
-        resp = requests.get(
+        resp = get_with_retry(
             f"https://api.lever.co/v0/postings/{slug}",
             params={"mode": "json", "limit": 50},
             headers=HEADERS,
             timeout=10,
         )
-        resp.raise_for_status()
         jobs = []
         for j in resp.json():
             title = j.get("text", "")
