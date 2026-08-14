@@ -101,7 +101,12 @@ A brief list of other notable items. One bullet per line. Plain English only.
 
 What Chinese AI labs and robotics companies released or published today. Plain English.
 If relevant to the global market (free to download, beats a global standard, new robot demo), say so clearly.
-If nothing notable today, write: Nothing notable from Chinese labs today.
+If the data below says none were detected, write: Nothing notable from Chinese labs today.
+
+Use this data (pulled separately from the whole day's ranked items, not just the
+Top Stories above — a Chinese release can be worth reporting here even if it
+didn't make the overall top 10):
+{china_context}
 
 - **[Lab or company name]:** [What they did, in plain language.] [Global relevance if any.]
 
@@ -135,6 +140,7 @@ def generate_digest(
     discipline_tally: str = "",
     trend_delta: str = "",
     market_context: str = "",
+    china_context: str = "",
 ) -> str:
     """Generate a markdown digest from the top N ranked items."""
     client = genai.Client(api_key=api_key)
@@ -155,6 +161,7 @@ def generate_digest(
         discipline_tally=discipline_tally or "No tally available.",
         trend_delta=trend_delta or "No prior day data available (first run).",
         market_context=market_context or "Market data unavailable.",
+        china_context=china_context or "No Chinese lab or robotics items detected today.",
     )
     response = generate_content_with_retry(
         client,

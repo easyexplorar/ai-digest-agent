@@ -18,6 +18,13 @@ WESTERN_LAB_FEEDS = [
     ("Apple ML Research",    "https://machinelearning.apple.com/rss.xml"),
     ("Hugging Face",         "https://huggingface.co/blog/feed.xml"),
     ("Microsoft Research",   "https://www.microsoft.com/en-us/research/feed/"),
+    # Anthropic doesn't publish an RSS/Atom feed for anthropic.com/news
+    # (verified live — no feed at any common path, none advertised via
+    # <link rel="alternate"> on the site). Their Claude Code release notes
+    # are the closest available substitute: real GitHub Atom feed, and
+    # directly relevant to this digest's AI-native-software-engineering
+    # and agent-framework coverage.
+    ("Claude Code (Anthropic)", "https://github.com/anthropics/claude-code/releases.atom"),
 ]
 
 # Chinese labs tracked via their HuggingFace organisation model releases
@@ -54,7 +61,8 @@ def fetch_lab_blogs() -> list[dict]:
                     "title": entry.get("title", "").strip(),
                     "url": entry.get("link", ""),
                     "summary": entry.get("summary", "")[:400],
-                    "date": entry.get("published", ""),
+                    # GitHub release Atom feeds set "updated", not "published"
+                    "date": entry.get("published", entry.get("updated", "")),
                 })
         except Exception:
             continue

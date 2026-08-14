@@ -5,7 +5,7 @@ from tracker import (
     save_snapshot, load_snapshot, load_yesterday,
     save_seen_urls, load_seen_urls,
     discipline_tally, trend_delta,
-    format_tally_text, format_delta_text,
+    format_tally_text, format_delta_text, format_china_context,
 )
 
 
@@ -111,3 +111,38 @@ def test_format_delta_text_no_prior_data():
     text = format_delta_text(delta)
     assert "(no prior data)" in text
     assert "(none)" in text
+
+
+def test_format_china_context_filters_by_discipline_not_overall_rank():
+    # Regression test for the bug this fixed: China items ranked outside the
+    # overall top 10 were invisible to the digest's China AI Watch section
+    # because generate_digest only saw ranked_items[:10]. This must pull
+    # from the full ranked list regardless of score/position.
+    ranked = [
+        {"title": "Top agent paper", "source": "arXiv", "url": "https://x/1",
+         "score": 29, "discipline": "Agent Security", "reason": "r"},
+        {"title": "DeepSeek release", "source": "DeepSeek (HuggingFace)", "url": "https://x/2",
+         "score": 12, "discipline": "Chinese Lab Developments", "reason": "new model"},
+        {"title": "Unitree demo", "source": "Unitree Robotics (Robotics HF)", "url": "https://x/3",
+         "score": 10, "discipline": "Chinese Embodied AI & Robotics", "reason": "new robot"},
+    ]
+    text = format_china_context(ranked)
+    assert "DeepSeek release" in text
+    assert "Unitree demo" in text
+    assert "Top agent paper" not in text
+
+
+def test_format_china_context_empty_when_no_china_items():
+    ranked = [{"title": "Other", "source": "arXiv", "url": "https://x",
+               "score": 20, "discipline": "Model Release", "reason": ""}]
+    assert format_china_context(ranked) == "No Chinese lab or robotics items detected today."
+
+
+def test_format_china_context_caps_at_top_n():
+    ranked = [
+        {"title": f"Item {i}", "source": "DeepSeek (HuggingFace)", "url": f"https://x/{i}",
+         "score": 10, "discipline": "Chinese Lab Developments", "reason": ""}
+        for i in range(8)
+    ]
+    text = format_china_context(ranked, top_n=3)
+    assert text.count("Item") == 3

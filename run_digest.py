@@ -25,7 +25,7 @@ from digest import generate_digest
 from tracker import (
     save_snapshot, save_seen_urls, load_yesterday, load_seen_urls,
     discipline_tally, trend_delta,
-    format_tally_text, format_delta_text,
+    format_tally_text, format_delta_text, format_china_context,
 )
 from notify import save_digest, send_windows_notification
 from weekly_rollup import is_friday, generate_weekly_rollup
@@ -86,6 +86,8 @@ def main():
     console.print(f"  Discipline pulse: {tally_txt}")
     console.print(f"  New today: {len(delta['new'])} | Recurring: {len(delta['recurring'])}")
 
+    china_txt = format_china_context(ranked)
+
     # ── Market signals ─────────────────────────────────────────────────────
     console.print("  Fetching market data...")
     try:
@@ -102,6 +104,7 @@ def main():
         discipline_tally=tally_txt,
         trend_delta=delta_txt,
         market_context=market_txt,
+        china_context=china_txt,
     )
     logger.info("Digest generated.")
 

@@ -107,3 +107,25 @@ def format_delta_text(delta: dict) -> str:
     lines += [f"\nRecurring from yesterday ({len(delta['recurring'])}):"]
     lines += recurring_titles or ["  (none)"]
     return "\n".join(lines)
+
+
+CHINA_DISCIPLINES = {"Chinese Lab Developments", "Chinese Embodied AI & Robotics"}
+
+
+def format_china_context(ranked_items: list[dict], top_n: int = 5) -> str:
+    """Build a dedicated text block of Chinese-lab/robotics items for the
+    digest's China AI Watch section, pulled from the *full* ranked list
+    rather than just the overall top N. Without this, that section only
+    ever saw whatever made the overall top 10 by score — and agent/safety
+    items routinely outscored Chinese model releases, so the section
+    reported "nothing notable" even on days with several DeepSeek/Qwen/
+    InternLM releases (verified against real ranked snapshots)."""
+    china_items = [
+        i for i in ranked_items if i.get("discipline") in CHINA_DISCIPLINES
+    ][:top_n]
+    if not china_items:
+        return "No Chinese lab or robotics items detected today."
+    return "\n".join(
+        f"- [{i['source']}] {i['title']} — {i.get('reason', '')} ({i['url']})"
+        for i in china_items
+    )
