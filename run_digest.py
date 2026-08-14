@@ -43,6 +43,7 @@ def main():
     if not api_key:
         console.print("[red]Error:[/red] GEMINI_API_KEY not set. Copy .env.example to .env and add your key.")
         logger.error("GEMINI_API_KEY not set — aborting run.")
+        send_windows_notification("AI Digest FAILED", "GEMINI_API_KEY not set — run aborted.")
         sys.exit(1)
 
     # ── Fetch ──────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ def main():
     if not items:
         console.print("[yellow]No items fetched. Check your internet connection.[/yellow]")
         logger.warning("No items fetched — ending run early.")
+        send_windows_notification("AI Digest FAILED", "No items fetched today — check your internet connection.")
         sys.exit(0)
 
     # Log every fetched URL today (not just whatever makes today's top-30
@@ -153,29 +155,38 @@ def main():
     if is_friday():
         console.print("\n[bold yellow]Friday — generating weekly rollup...[/bold yellow]")
         logger.info("Friday — generating weekly rollup.")
-        rollup = generate_weekly_rollup(api_key)
-        if rollup:
-            console.print(Markdown(rollup))
-            logger.info("Weekly rollup generated.")
-            send_windows_notification(
-                "Weekly AI Rollup Ready",
-                "Your weekly AI trends interpretation is saved in the output folder.",
-            )
-
-            if smtp_user and smtp_pass and email_to:
-                week_label = date.today().strftime("%d %b %Y")
-                try:
-                    send_rollup_email(
-                        smtp_host, smtp_port, smtp_user, smtp_pass,
-                        email_to, rollup, week_label,
-                    )
-                    console.print(f"  Email: [green]weekly rollup sent to {email_to}[/green]")
-                    logger.info(f"Weekly rollup emailed to {email_to}.")
-                except Exception as e:
-                    console.print(f"  Email: [red]weekly rollup failed — {e}[/red]")
-                    logger.error(f"Weekly rollup email failed: {e}")
+        try:
+            rollup = generate_weekly_rollup(api_key)
+        except Exception as e:
+            # Isolated from the outer crash handler so a rollup failure
+            # (e.g. Gemini exhausting retries) can't take down a run whose
+            # daily digest already succeeded and was already emailed above.
+            console.print(f"  [red]Weekly rollup failed — {e}[/red]")
+            logger.error(f"Weekly rollup generation failed: {e}")
+            send_windows_notification("Weekly Rollup FAILED", f"Rollup generation failed: {e}")
         else:
-            logger.warning("Weekly rollup produced no output (no daily digests found this week).")
+            if rollup:
+                console.print(Markdown(rollup))
+                logger.info("Weekly rollup generated.")
+                send_windows_notification(
+                    "Weekly AI Rollup Ready",
+                    "Your weekly AI trends interpretation is saved in the output folder.",
+                )
+
+                if smtp_user and smtp_pass and email_to:
+                    week_label = date.today().strftime("%d %b %Y")
+                    try:
+                        send_rollup_email(
+                            smtp_host, smtp_port, smtp_user, smtp_pass,
+                            email_to, rollup, week_label,
+                        )
+                        console.print(f"  Email: [green]weekly rollup sent to {email_to}[/green]")
+                        logger.info(f"Weekly rollup emailed to {email_to}.")
+                    except Exception as e:
+                        console.print(f"  Email: [red]weekly rollup failed — {e}[/red]")
+                        logger.error(f"Weekly rollup email failed: {e}")
+            else:
+                logger.warning("Weekly rollup produced no output (no daily digests found this week).")
 
     logger.info("=== Run finished ===")
 
@@ -185,6 +196,7 @@ if __name__ == "__main__":
         main()
     except SystemExit:
         raise
-    except Exception:
+    except Exception as e:
         logger.exception("Run crashed with an unhandled exception.")
+        send_windows_notification("AI Digest FAILED", f"Run crashed: {e}")
         raise
