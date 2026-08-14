@@ -30,6 +30,7 @@ from tracker import (
 from notify import save_digest, send_windows_notification
 from weekly_rollup import is_friday, generate_weekly_rollup
 from email_sender import send_digest_email, send_rollup_email
+from retention import prune_output
 
 load_dotenv()
 console = Console(file=_utf8_stdout) if _utf8_stdout else Console()
@@ -108,6 +109,15 @@ def main():
     console.print(f"  Digest  → [green]{output_file}[/green]")
     console.print(f"  Snapshot→ [green]{snapshot_file}[/green]\n")
     logger.info(f"Saved digest to {output_file}, snapshot to {snapshot_file}.")
+
+    # ── Prune old output ──────────────────────────────────────────────────
+    try:
+        pruned = prune_output(logger=logger)
+        if pruned:
+            console.print(f"  Pruned [dim]{len(pruned)} file(s) older than retention window.[/dim]")
+    except Exception as e:
+        console.print(f"  [yellow]Output pruning failed — {e}[/yellow]")
+        logger.warning(f"Output pruning failed: {e}")
 
     # ── Display ────────────────────────────────────────────────────────────
     console.print(Markdown(digest_text))
