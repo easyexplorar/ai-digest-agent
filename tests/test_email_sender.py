@@ -33,8 +33,22 @@ def test_normalise_lists_leaves_normal_lines_alone():
 def test_logo_html_falls_back_to_wordmark_when_missing(monkeypatch, tmp_path):
     monkeypatch.setenv("LOGO_PATH", str(tmp_path / "does_not_exist.png"))
     html = _logo_html()
-    assert "REDACTED_BRAND" in html
+    assert "AI Digest" in html
     assert "<img" not in html
+
+
+def test_logo_html_falls_back_to_wordmark_when_unset(monkeypatch):
+    monkeypatch.delenv("LOGO_PATH", raising=False)
+    html = _logo_html()
+    assert "AI Digest" in html
+    assert "<img" not in html
+
+
+def test_logo_html_uses_custom_brand_name(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOGO_PATH", str(tmp_path / "does_not_exist.png"))
+    monkeypatch.setenv("BRAND_NAME", "Acme Corp")
+    html = _logo_html()
+    assert "Acme Corp" in html
 
 
 def test_logo_html_embeds_image_when_present(monkeypatch, tmp_path):

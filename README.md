@@ -31,6 +31,8 @@ Fetches AI/agentic-systems news from arXiv, lab blogs, and community sources, ra
    | `SMTP_USER`, `SMTP_PASS` | No | SMTP credentials. If unset, email delivery is skipped and the digest is only saved locally |
    | `EMAIL_TO` | No | Recipient address for the daily digest and weekly rollup |
    | `LOGO_PATH` | No | Path to a logo image for the PDF header (falls back to a text wordmark) |
+   | `BRAND_NAME` | No | Wordmark text shown when no `LOGO_PATH` is set (default `AI Digest`) |
+   | `REPORT_DISCLAIMER` | No | Footer disclaimer text on the PDF report |
    | `OUTPUT_RETENTION_DAYS` | No | Days to keep files in `output/` before auto-pruning (default 30) |
 
    `.env` is gitignored — never commit it.

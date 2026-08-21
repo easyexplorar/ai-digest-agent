@@ -11,23 +11,26 @@ from pathlib import Path
 import markdown
 from xhtml2pdf import pisa
 
-# Optional — falls back to a text "REDACTED_BRAND" wordmark (see _logo_html) if unset
-# or the file doesn't exist, so this is safe to leave unset on other machines.
-# Read lazily (not at import time): callers like run_digest.py import this
-# module before load_dotenv() runs, so an eager os.getenv() here would miss
-# a LOGO_PATH set only in .env.
-_DEFAULT_LOGO_PATH = r"REDACTED_LOGO_PATH"
+# LOGO_PATH, BRAND_NAME, and REPORT_DISCLAIMER are all optional and read
+# lazily (not at import time): callers like run_digest.py import this module
+# before load_dotenv() runs, so an eager os.getenv() here would miss values
+# set only in .env. With none set, the PDF falls back to a text wordmark and
+# a generic disclaimer — safe defaults for running this project as-is.
+_DEFAULT_BRAND_NAME = "AI Digest"
+_DEFAULT_DISCLAIMER = "This report is AI-generated and may contain inaccuracies."
 
 
-def _logo_path() -> Path:
-    return Path(os.getenv("LOGO_PATH", _DEFAULT_LOGO_PATH))
+def _logo_path() -> Path | None:
+    raw = os.getenv("LOGO_PATH")
+    return Path(raw) if raw else None
 
 
-DISCLAIMER = (
-    "Confidential — REDACTED_BRAND internal only. "
-    "This report is AI-generated and may contain inaccuracies. "
-    "Not intended for external distribution."
-)
+def _brand_name() -> str:
+    return os.getenv("BRAND_NAME", _DEFAULT_BRAND_NAME)
+
+
+def _disclaimer() -> str:
+    return os.getenv("REPORT_DISCLAIMER", _DEFAULT_DISCLAIMER)
 
 PDF_CSS = """
 @page { margin: 2cm; }
@@ -96,7 +99,7 @@ _LOGO_TARGET_HEIGHT_PX = 360  # 60pt (~120px at 144dpi) × 3× for crisp PDF ren
 
 def _logo_html() -> str:
     logo_path = _logo_path()
-    if logo_path.exists():
+    if logo_path and logo_path.exists():
         try:
             import io
             from PIL import Image
@@ -111,7 +114,7 @@ def _logo_html() -> str:
             data = base64.b64encode(logo_path.read_bytes()).decode()
         uri = f"data:image/png;base64,{data}"
         return f'<td class="logo-cell"><img src="{uri}" /></td>'
-    return '<td class="logo-cell"><span class="logo-text">REDACTED_BRAND</span></td>'
+    return f'<td class="logo-cell"><span class="logo-text">{_brand_name()}</span></td>'
 
 
 def _normalise_lists(text: str) -> str:
@@ -157,7 +160,7 @@ def md_to_pdf(md_text: str, output_path: Path, date_label: str = "", report_type
 
 {body_html}
 
-<div class="disclaimer">{DISCLAIMER}</div>
+<div class="disclaimer">{_disclaimer()}</div>
 </body>
 </html>"""
 
