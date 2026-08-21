@@ -27,7 +27,7 @@ Fetches AI/agentic-systems news from arXiv, lab blogs, and community sources, ra
    | Variable | Required | Purpose |
    |---|---|---|
    | `XAI_API_KEY` | Yes | Grok API key used for ranking and digest/rollup generation |
-   | `SMTP_HOST`, `SMTP_PORT` | No | SMTP server for emailing digests (defaults to a local Proton Mail Bridge at `127.0.0.1:1025`) |
+   | `SMTP_HOST`, `SMTP_PORT` | No | SMTP server for emailing digests. Defaults assume a local Proton Mail Bridge (`127.0.0.1`, port `1025` is Bridge's common default) — `1025` is configurable, so check your own Bridge app's SMTP/IMAP settings for the actual port |
    | `SMTP_USER`, `SMTP_PASS` | No | SMTP credentials. If unset, email delivery is skipped and the digest is only saved locally |
    | `EMAIL_TO` | No | Recipient address for the daily digest and weekly rollup |
    | `LOGO_PATH` | No | Path to a logo image for the PDF header (falls back to a text wordmark) |
