@@ -34,7 +34,10 @@ from email_sender import send_digest_email, send_rollup_email
 from retention import prune_output
 
 load_dotenv()
-console = Console(file=_utf8_stdout) if _utf8_stdout else Console()
+# legacy_windows=False: skip Rich's Win32 console API path, which crashes
+# (OSError: Invalid argument on flush) when there's no real console attached
+# — e.g. a Task Scheduler run that fired while nothing was watching.
+console = Console(file=_utf8_stdout, legacy_windows=False) if _utf8_stdout else Console(legacy_windows=False)
 logger = setup_logging()
 
 
