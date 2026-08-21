@@ -2,9 +2,11 @@
 
 from datetime import date, timedelta
 from pathlib import Path
-from google import genai
+from openai import OpenAI
 
-from gemini_utils import generate_content_with_retry
+from grok_utils import generate_content_with_retry
+
+MODEL = "grok-4-fast"
 
 
 WEEKLY_PROMPT = """You are a senior AI research strategist writing a weekly intelligence report for a practitioner who monitors AI and agentic system trends.
@@ -110,7 +112,7 @@ def generate_weekly_rollup(api_key: str, output_dir: str = "output") -> str:
         jobs = []
     jobs_text = _format_jobs_text(jobs)
 
-    client = genai.Client(api_key=api_key)
+    client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
     prompt = WEEKLY_PROMPT.format(
         daily_digests=combined,
         week_start=week_start,
@@ -118,10 +120,10 @@ def generate_weekly_rollup(api_key: str, output_dir: str = "output") -> str:
     )
     response = generate_content_with_retry(
         client,
-        model="gemini-2.5-flash",
-        contents=prompt,
+        model=MODEL,
+        messages=[{"role": "user", "content": prompt}],
     )
-    rollup_text = response.text.strip()
+    rollup_text = response.choices[0].message.content.strip()
 
     out = Path(output_dir)
     filename = out / f"weekly_{today.strftime('%Y%m%d')}.md"

@@ -1,16 +1,16 @@
-"""Uses Gemini to score and rank fetched items by novelty and relevance."""
+"""Uses Grok to score and rank fetched items by novelty and relevance."""
 
 import json
 import logging
 import re
-from google import genai
-from google.genai import types
+from openai import OpenAI
 
-from gemini_utils import generate_content_with_retry
+from grok_utils import generate_content_with_retry
 
 logger = logging.getLogger("ai_digest")
 
-CHUNK_SIZE = 40  # items per Gemini call — keeps responses clean and avoids JSON truncation
+MODEL = "grok-4-fast"
+CHUNK_SIZE = 40  # items per Grok call — keeps responses clean and avoids JSON truncation
 
 
 RANKING_PROMPT = """You are an expert AI research analyst. Your job is to identify which of the items below represent genuinely novel, early-signal developments in AI and agentic systems — things that are NOT yet mainstream public knowledge.
@@ -69,14 +69,14 @@ Items to evaluate:
 
 
 def _extract_json(raw: str) -> list:
-    """Robustly extract a JSON array from a Gemini response."""
+    """Robustly extract a JSON array from a Grok response."""
     # Strip markdown fences
     raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`").strip()
     # Find the outermost JSON array
     match = re.search(r"\[.*\]", raw, re.DOTALL)
     if match:
         raw = match.group(0)
-    # Remove trailing commas before ] or } (common Gemini quirk)
+    # Remove trailing commas before ] or } (common LLM quirk)
     raw = re.sub(r",\s*([}\]])", r"\1", raw)
     return json.loads(raw)
 
@@ -91,13 +91,10 @@ def _rank_chunk(client, items_chunk: list[dict], offset: int) -> tuple[dict, dic
     prompt = RANKING_PROMPT.format(items_text=items_text)
     response = generate_content_with_retry(
         client,
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-        ),
+        model=MODEL,
+        messages=[{"role": "user", "content": prompt}],
     )
-    scores = _extract_json(response.text.strip())
+    scores = _extract_json(response.choices[0].message.content.strip())
     score_map      = {s["index"]: s["novelty"] + s["relevance"] + s["signal"] for s in scores}
     reason_map     = {s["index"]: s.get("one_line", "") for s in scores}
     discipline_map = {s["index"]: s.get("discipline", "Other") for s in scores}
@@ -105,8 +102,8 @@ def _rank_chunk(client, items_chunk: list[dict], offset: int) -> tuple[dict, dic
 
 
 def rank_items(items: list[dict], api_key: str) -> list[dict]:
-    """Score items with Gemini in chunks and return sorted by combined score."""
-    client = genai.Client(api_key=api_key)
+    """Score items with Grok in chunks and return sorted by combined score."""
+    client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
     score_map:      dict[int, int] = {}
     reason_map:     dict[int, str] = {}
     discipline_map: dict[int, str] = {}

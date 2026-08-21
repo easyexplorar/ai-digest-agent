@@ -1,8 +1,10 @@
-"""Generates the daily digest summary using Gemini."""
+"""Generates the daily digest summary using Grok."""
 
-from google import genai
+from openai import OpenAI
 
-from gemini_utils import generate_content_with_retry
+from grok_utils import generate_content_with_retry
+
+MODEL = "grok-4-fast"
 
 
 DIGEST_PROMPT = """You are writing a daily AI briefing for a smart, curious business reader who is NOT a programmer or academic. They care about what's happening in AI and what it means for the world — but they switch off the moment they see jargon.
@@ -161,7 +163,7 @@ def generate_digest(
     frontier_context: str = "",
 ) -> str:
     """Generate a markdown digest from the top N ranked items."""
-    client = genai.Client(api_key=api_key)
+    client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
 
     top = ranked_items[:top_n]
     items_text = "\n".join(
@@ -184,7 +186,7 @@ def generate_digest(
     )
     response = generate_content_with_retry(
         client,
-        model="gemini-2.5-flash",
-        contents=prompt,
+        model=MODEL,
+        messages=[{"role": "user", "content": prompt}],
     )
-    return response.text.strip()
+    return response.choices[0].message.content.strip()

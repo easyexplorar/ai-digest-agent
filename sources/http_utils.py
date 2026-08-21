@@ -1,7 +1,7 @@
 """Shared retry/backoff wrapper for outbound HTTP calls made by the source
 fetchers (fetchers.py, community.py, lab_blogs.py, jobs.py).
 
-Mirrors gemini_utils.generate_content_with_retry: a transient network blip
+Mirrors grok_utils.generate_content_with_retry: a transient network blip
 during an unattended run previously killed that fetcher's entire result
 outright (each site wrapped its own single attempt in a bare except). This
 gives them a shared retry policy instead of each rolling its own.

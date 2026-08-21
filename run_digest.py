@@ -40,11 +40,11 @@ logger = setup_logging()
 
 def main():
     logger.info("=== Run started ===")
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("XAI_API_KEY")
     if not api_key:
-        console.print("[red]Error:[/red] GEMINI_API_KEY not set. Copy .env.example to .env and add your key.")
-        logger.error("GEMINI_API_KEY not set — aborting run.")
-        send_windows_notification("AI Digest FAILED", "GEMINI_API_KEY not set — run aborted.")
+        console.print("[red]Error:[/red] XAI_API_KEY not set. Copy .env.example to .env and add your key.")
+        logger.error("XAI_API_KEY not set — aborting run.")
+        send_windows_notification("AI Digest FAILED", "XAI_API_KEY not set — run aborted.")
         sys.exit(1)
 
     # ── Fetch ──────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ def main():
             console.print(f"  Skipped [bold]{filtered}[/bold] already-seen item(s) from recent snapshots.")
 
     # ── Rank ───────────────────────────────────────────────────────────────
-    console.print("  Ranking with Gemini...")
+    console.print("  Ranking with Grok...")
     ranked = rank_items(items, api_key)
     logger.info(f"Ranked {len(ranked)} items.")
 
@@ -166,7 +166,7 @@ def main():
             rollup = generate_weekly_rollup(api_key)
         except Exception as e:
             # Isolated from the outer crash handler so a rollup failure
-            # (e.g. Gemini exhausting retries) can't take down a run whose
+            # (e.g. Grok exhausting retries) can't take down a run whose
             # daily digest already succeeded and was already emailed above.
             console.print(f"  [red]Weekly rollup failed — {e}[/red]")
             logger.error(f"Weekly rollup generation failed: {e}")
