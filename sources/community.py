@@ -43,6 +43,12 @@ HN_KEYWORDS = [
     # since HN's coverage skews US/EU headline news rather than being
     # comprehensive; revisit with a real policy feed if this proves thin.
     "AI regulation", "AI Act", "AI executive order",
+    # Optical circuit switching for AI data-center networking (GPU/TPU
+    # cluster interconnect reconfiguration) and its main technology
+    # methods. Proprietary/industry-driven rather than academic-paper-
+    # driven, so HN is the better signal source here vs. arXiv.
+    "optical circuit switch", "silicon photonics", "co-packaged optics",
+    "MEMS switch", "liquid crystal on silicon", "piezoelectric switch",
 ]
 
 HEADERS = {"User-Agent": "AI-Digest-Agent/1.0 (research digest tool)"}
