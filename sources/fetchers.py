@@ -78,6 +78,38 @@ def fetch_arxiv_robotics(max_results: int = 15) -> list[dict]:
     return results
 
 
+def fetch_arxiv_emerging(max_results: int = 15) -> list[dict]:
+    """Fetch recent papers on topics not covered by fetch_arxiv/fetch_arxiv_robotics
+    (world models, video generation, computer-use/browser agents, agent interop
+    protocols). Kept as its own query rather than folded into those: appending
+    these terms to the already-large existing queries pushed arXiv's search
+    backend past a ~25s timeout on every request (verified live — the same
+    terms in a standalone query return in ~1s), so a separate, smaller query
+    is what actually keeps this reliable rather than just adding coverage."""
+    query = (
+        "ti:world+model+OR+ti:video+generation+OR+ti:video+diffusion"
+        "+OR+ti:world+simulation+OR+ti:computer+use+OR+ti:browser+agent"
+        "+OR+ti:GUI+agent+OR+ti:A2A+OR+ti:Agent2Agent+OR+ti:agent+payments"
+    )
+    url = (
+        f"http://export.arxiv.org/api/query"
+        f"?search_query=(cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.RO)+AND+({query})"
+        f"&sortBy=submittedDate&sortOrder=descending"
+        f"&max_results={max_results}"
+    )
+    feed = parse_feed_with_retry(url)
+    results = []
+    for entry in feed.entries:
+        results.append({
+            "source": "arXiv",
+            "title": entry.title.replace("\n", " "),
+            "url": entry.link,
+            "summary": entry.summary[:500],
+            "date": entry.get("published", ""),
+        })
+    return results
+
+
 def fetch_huggingface_papers() -> list[dict]:
     """Fetch daily papers from Hugging Face via the daily_papers API."""
     try:
@@ -112,6 +144,7 @@ def fetch_github_trending() -> list[dict]:
         "robot", "embodied", "humanoid", "lora", "qlora", "quantiz",
         "vla", "speech", "voice agent", "swe", "coding agent", "edge ai",
         "alignment", "rlhf", "dpo", "grpo", "speculative", "mixture of experts",
+        "world model", "video generation", "computer use", "a2a",
     }
     results = []
     for entry in feed.entries[:30]:
@@ -157,6 +190,7 @@ def fetch_all() -> list[dict]:
     all_fetchers = [
         fetch_arxiv,
         fetch_arxiv_robotics,
+        fetch_arxiv_emerging,
         fetch_huggingface_papers,
         fetch_github_trending,
         fetch_alignment_forum,

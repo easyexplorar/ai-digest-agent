@@ -14,12 +14,35 @@ HN_KEYWORDS = [
     "fine-tuning", "LoRA", "local LLM", "edge AI", "quantization",
     "AI alignment", "prompt injection", "agent security",
     "embodied AI", "humanoid robot", "voice AI", "DeepSeek", "Qwen",
+    # Lab/company names, as distinct from product names above — news
+    # phrased around the company (funding, org changes, policy) doesn't
+    # always mention the product name, so both need their own search.
+    "Anthropic", "OpenAI", "xAI", "Grok", "Meta AI", "Llama",
+    "Mistral AI", "Cohere", "Perplexity AI",
     # Frontier-lab founders (OpenAI/Google/Meta alumni now running their own
     # labs) — most of these labs have no blog/RSS feed of their own yet, so
     # HN discussion is the main way their news gets caught at all.
     "Safe Superintelligence", "Ilya Sutskever", "AMI Labs", "Yann LeCun",
     "Discovery Loop", "Jeff Dean", "Thinking Machines Lab", "Mira Murati",
     "Andrew Ng", "DeepLearning.AI",
+    # World models / video generation — no coverage anywhere else (not a
+    # paper-title convention arXiv's search handles well, so HN carries it).
+    "world model", "video generation",
+    # Agent interop protocols and computer/browser-control agents — parallel
+    # tracks to MCP that weren't caught by the existing agent keywords.
+    "Agent2Agent", "agent payments protocol", "computer use agent",
+    "browser agent",
+    # Custom AI silicon beyond NVIDIA.
+    "Trainium", "TPU chip", "Cerebras", "Groq chip", "custom AI chip",
+    # AI compute/energy infrastructure — no keyword or source covered this
+    # at all despite it being a constant 2025-2026 storyline.
+    "AI data center", "AI power deal", "AI compute buildout",
+    # Funding/M&A — not paper- or repo-shaped, so this is HN-only.
+    "AI funding round", "AI startup raises", "AI acquisition",
+    # Policy/regulation — HN-only for now rather than a dedicated feed,
+    # since HN's coverage skews US/EU headline news rather than being
+    # comprehensive; revisit with a real policy feed if this proves thin.
+    "AI regulation", "AI Act", "AI executive order",
 ]
 
 HEADERS = {"User-Agent": "AI-Digest-Agent/1.0 (research digest tool)"}
