@@ -37,16 +37,18 @@ def get_with_retry(url: str, attempts: int = 3, base_delay: float = 1.0, session
 
 def parse_feed_with_retry(url: str, request_headers: dict | None = None,
                            attempts: int = 3, base_delay: float = 1.0):
-    """Parse an RSS/Atom feed, retrying if the fetch came back empty due to
-    a network failure. feedparser doesn't raise on network errors — it sets
-    feed.bozo and returns zero entries — so that combination (no entries,
-    bozo set) is what triggers a retry. A feed that's merely not
-    well-formed XML but still yielded entries is left alone; retrying that
-    wouldn't help and would just add latency."""
+    """Parse an RSS/Atom feed, retrying if the fetch came back empty.
+    feedparser doesn't raise on network errors — it sets feed.bozo and
+    returns zero entries — but some hosts (arXiv's export API in
+    particular) intermittently return a well-formed, zero-entry feed for a
+    query that should match plenty of results, without setting bozo at
+    all. So any empty result is treated as retryable, not just malformed
+    ones; a feed that's merely not well-formed XML but still yielded
+    entries is left alone, since retrying that wouldn't help."""
     feed = None
     for attempt in range(1, attempts + 1):
         feed = feedparser.parse(url, request_headers=request_headers)
-        if feed.entries or not feed.bozo:
+        if feed.entries:
             return feed
         if attempt == attempts:
             logger.warning(
