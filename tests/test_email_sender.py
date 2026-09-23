@@ -141,3 +141,75 @@ def test_sends_one_message_per_recipient(fake_smtp):
     session = _FakeSMTP.instances[0]
     assert len(session.sent_messages) == 2
     assert {msg["To"] for msg in session.sent_messages} == {"a@example.com", "b@example.com"}
+
+
+# ── connect retry/backoff (fix: a local bridge like Proton Mail Bridge may
+#    not be open yet when Task Scheduler's StartWhenAvailable fires a
+#    missed run right at boot, so the connect phase gets retried) ────────
+
+class _FlakySMTP:
+    """Refuses to connect the first `fail_count` times, then behaves like
+    _FakeSMTP. Models a local mail bridge that isn't open/unlocked yet."""
+    fail_count = 0
+    call_count = 0
+    instances = []
+
+    def __init__(self, host, port):
+        _FlakySMTP.call_count += 1
+        if _FlakySMTP.call_count <= _FlakySMTP.fail_count:
+            raise ConnectionRefusedError("bridge not up yet")
+        self.host = host
+        self.port = port
+        self.starttls_context = None
+        self.sent_messages = []
+        _FlakySMTP.instances.append(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def starttls(self, context=None):
+        self.starttls_context = context
+
+    def login(self, user, password):
+        pass
+
+    def send_message(self, msg):
+        self.sent_messages.append(msg)
+
+
+@pytest.fixture
+def flaky_smtp(monkeypatch, tmp_path):
+    _FlakySMTP.fail_count = 0
+    _FlakySMTP.call_count = 0
+    _FlakySMTP.instances = []
+    monkeypatch.setattr(email_sender.smtplib, "SMTP", _FlakySMTP)
+    monkeypatch.setattr(email_sender.time, "sleep", lambda s: None)  # keep tests fast
+    pdf_path = tmp_path / "digest.pdf"
+    pdf_path.write_bytes(b"%PDF-fake")
+    return pdf_path
+
+
+def test_retries_connect_then_succeeds(flaky_smtp):
+    _FlakySMTP.fail_count = 2
+    result = send_email("127.0.0.1", 1025, "user", "pass", "a@example.com",
+                         "subject", "body", flaky_smtp,
+                         connect_attempts=5, connect_retry_delay=0)
+
+    assert result is True
+    assert _FlakySMTP.call_count == 3  # failed twice, succeeded on the 3rd
+    # only one live session ever reached the send loop, so no duplicate sends
+    assert len(_FlakySMTP.instances) == 1
+    assert len(_FlakySMTP.instances[0].sent_messages) == 1
+
+
+def test_gives_up_after_exhausting_connect_attempts(flaky_smtp):
+    _FlakySMTP.fail_count = 99  # never succeeds
+    with pytest.raises(ConnectionRefusedError):
+        send_email("127.0.0.1", 1025, "user", "pass", "a@example.com",
+                    "subject", "body", flaky_smtp,
+                    connect_attempts=3, connect_retry_delay=0)
+
+    assert _FlakySMTP.call_count == 3

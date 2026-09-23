@@ -1,15 +1,19 @@
 """Convert markdown digest to PDF and send via email."""
 
 import base64
+import logging
 import os
 import smtplib
 import ssl
 import tempfile
+import time
 from email.message import EmailMessage
 from pathlib import Path
 
 import markdown
 from xhtml2pdf import pisa
+
+logger = logging.getLogger("ai_digest")
 
 # LOGO_PATH, BRAND_NAME, and REPORT_DISCLAIMER are all optional and read
 # lazily (not at import time): callers like run_digest.py import this module
@@ -169,6 +173,41 @@ def md_to_pdf(md_text: str, output_path: Path, date_label: str = "", report_type
     return not status.err
 
 
+def _connect_with_retry(
+    smtp_host: str,
+    smtp_port: int,
+    smtp_user: str,
+    smtp_pass: str,
+    ctx: ssl.SSLContext,
+    attempts: int,
+    retry_delay: float,
+) -> smtplib.SMTP:
+    """Connect and log in, retrying on failure. Scoped to just this phase —
+    local bridges like Proton Mail Bridge are a desktop app the user has to
+    have open and unlocked, so a scheduled run that fires before that
+    (e.g. via Task Scheduler's StartWhenAvailable catch-up on boot) would
+    otherwise hit a connection refusal with no chance to recover. Only the
+    connect/login phase is retried, not the send loop below, so a failure
+    after some recipients already got their message can't resend to them."""
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls(context=ctx)
+            server.login(smtp_user, smtp_pass)
+            return server
+        except Exception as e:
+            last_exc = e
+            if attempt == attempts:
+                break
+            logger.warning(
+                f"SMTP connect to {smtp_host}:{smtp_port} failed "
+                f"(attempt {attempt}/{attempts}): {e} — retrying in {retry_delay:.0f}s"
+            )
+            time.sleep(retry_delay)
+    raise last_exc
+
+
 def send_email(
     smtp_host: str,
     smtp_port: int,
@@ -178,6 +217,8 @@ def send_email(
     subject: str,
     body_text: str,
     pdf_path: Path,
+    connect_attempts: int = 6,
+    connect_retry_delay: float = 30.0,
 ) -> bool:
     """Send one message per recipient in `to_addr` (comma-separated) so each
     person's inbox only shows their own address in the To: header, never the
@@ -192,9 +233,10 @@ def send_email(
         # leaves the machine. Any real remote host still gets full verification.
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
-        server.starttls(context=ctx)
-        server.login(smtp_user, smtp_pass)
+
+    with _connect_with_retry(
+        smtp_host, smtp_port, smtp_user, smtp_pass, ctx, connect_attempts, connect_retry_delay
+    ) as server:
         for recipient in recipients:
             msg = EmailMessage()
             msg["From"] = smtp_user
