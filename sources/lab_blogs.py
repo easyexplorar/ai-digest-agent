@@ -18,6 +18,12 @@ WESTERN_LAB_FEEDS = [
     ("Apple ML Research",    "https://machinelearning.apple.com/rss.xml"),
     ("Hugging Face",         "https://huggingface.co/blog/feed.xml"),
     ("Microsoft Research",   "https://www.microsoft.com/en-us/research/feed/"),
+    # Broader than DeepMind's blog (which is AI-model-focused) — covers
+    # Google's wider research output including infrastructure work like
+    # their Apollo optical circuit switching project, which HN/arXiv
+    # searches for OCS topics turned up essentially nothing on (verified
+    # live, 2026-09-23: zero HN hits over 90 days, arXiv too noisy to use).
+    ("Google Research",      "https://research.google/blog/rss/"),
     # Anthropic doesn't publish an RSS/Atom feed for anthropic.com/news
     # (verified live — no feed at any common path, none advertised via
     # <link rel="alternate"> on the site). Their Claude Code release notes
