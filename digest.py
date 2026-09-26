@@ -68,7 +68,7 @@ Use this data:
 
 ## Top Stories
 
-For each of the 3–5 top items, write one story block in this exact format. Each block starts with a ### heading and has clearly labelled paragraphs. Put a --- divider between each story block.
+For each of the 5–8 top items (use 8 on a busy day, fewer only if the remaining items are genuinely weak), write one story block in this exact format. Each block starts with a ### heading and has clearly labelled paragraphs. Put a --- divider between each story block.
 
 ### [Short, plain English headline — describe what it does or why it matters, not its technical name]
 
@@ -130,15 +130,31 @@ just the Top Stories above):
 - **[Person — Lab name]:** [What they did or said, in plain language.] [Why it matters, given who they are.]
 
 
-## Market Signals
+## Capital Markets Lens
 
-How the public markets are reacting to AI right now, for a reader who wants the business angle, not a stock tip.
+What today's AI news means for capital markets, for a reader who wants the business angle, not a stock tip.
 
-2–3 plain sentences on what today's price moves and analyst sentiment across major AI-exposed companies suggest about investor confidence in AI right now. Call out any stock with a notably large move or an upcoming earnings date and connect it to today's AI news if there's a plausible link. If the data looks flat or unremarkable, say so plainly rather than inventing significance.
-If market data is unavailable, write: Market data unavailable today.
+2–3 plain sentences on what today's price moves and analyst sentiment across major AI-exposed companies suggest about investor confidence in AI right now. Name every stock that moved 2% or more (with the % move) and any upcoming earnings date and connect it to today's AI news if there's a plausible link. If the data looks flat or unremarkable, say so plainly rather than inventing significance.
+
+Then 2–3 bullets interpreting today's Top Stories for investors — which sectors, business models, or kinds of companies they strengthen or threaten (e.g. chipmakers, cloud providers, software vendors, robotics makers), and why. Name companies only when the story clearly involves them. No buy/sell advice.
+
+- **[Sector or company group]:** [What today's news means for it, in one plain sentence.]
+
+Only if the data below is exactly "Market data unavailable.", replace the 2–3 sentences with: Live market data unavailable today. Otherwise never say the data is unavailable.
 
 Use this data:
 {market_context}
+
+
+## Skills Gap: What to Learn
+
+What today's AI news means for people's jobs and skills. Ground every point in today's stories — no generic "learn AI" advice.
+
+1–2 plain sentences on which kinds of work today's news makes more valuable, and which tasks it is starting to automate.
+
+Then 3–5 specific skills worth building now, one bullet each:
+
+- **[Specific skill — e.g. "Writing clear instructions and test cases for AI coding assistants", not "AI literacy"]:** [Who should learn it (role or profession) and why today's news makes it matter.] *Start by:* [one concrete first step — a free course, tool to try, or small practice project.]
 
 
 ## The Big Picture
@@ -155,7 +171,7 @@ Top-ranked items to use as your source material:
 def generate_digest(
     ranked_items: list[dict],
     api_key: str,
-    top_n: int = 10,
+    top_n: int = 15,
     discipline_tally: str = "",
     trend_delta: str = "",
     market_context: str = "",

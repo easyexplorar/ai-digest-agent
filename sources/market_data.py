@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import yfinance as yf
 
-# The ~15 tickers referenced in the digest prompt's Market Signals section
+# The ~15 tickers referenced in the digest prompt's Capital Markets Lens section
 TICKERS = [
     "NVDA", "MSFT", "GOOGL", "META", "AMZN",
     "AMD", "AVGO", "ARM", "INTC", "SMCI",
