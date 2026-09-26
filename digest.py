@@ -1,5 +1,7 @@
 """Generates the daily digest summary using Grok."""
 
+import re
+
 from openai import OpenAI
 
 from grok_utils import generate_content_with_retry
@@ -35,6 +37,7 @@ FORMAT RULES (critical for PDF readability):
 - Never put multiple bullet items on the same line
 - In Top Stories, each story is its own ### heading followed by labelled paragraphs — never a single dense paragraph
 - Do not repeat or echo the section instructions in your output
+- Every bullet that starts with a label must bold the label and its colon, exactly like "- **Label:** text" — never "- Label: text"
 - Only list categories in Today's Snapshot that have a count of 1 or more
 
 ---
@@ -168,6 +171,21 @@ Top-ranked items to use as your source material:
 """
 
 
+# Sections whose bullets are "- Label: text"; the model sometimes drops the
+# bold on these labels even with the rule in the prompt, so it's enforced here.
+_LABELLED_SECTIONS = ("## Capital Markets Lens", "## Skills Gap: What to Learn")
+_PLAIN_LABEL = re.compile(r"^- (?!\*\*)([^:*\n]{2,120}):\s+", re.M)
+
+
+def _bold_bullet_labels(text: str) -> str:
+    """Bold unbolded '- Label: text' bullets inside _LABELLED_SECTIONS."""
+    parts = re.split(r"(?m)^(?=## )", text)
+    return "".join(
+        _PLAIN_LABEL.sub(r"- **\1:** ", part) if part.startswith(_LABELLED_SECTIONS) else part
+        for part in parts
+    )
+
+
 def generate_digest(
     ranked_items: list[dict],
     api_key: str,
@@ -205,4 +223,4 @@ def generate_digest(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.choices[0].message.content.strip()
+    return _bold_bullet_labels(response.choices[0].message.content.strip())
