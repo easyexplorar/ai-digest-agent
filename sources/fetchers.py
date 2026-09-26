@@ -1,9 +1,16 @@
 """Fetchers for each data source."""
 
+import logging
+import time
 from datetime import datetime, timezone, timedelta
+
+import feedparser
+import requests
 
 from dedup_utils import normalize_title
 from sources.http_utils import get_with_retry, parse_feed_with_retry
+
+logger = logging.getLogger("ai_digest")
 
 
 def _is_recent(date_str: str, days: int = 2) -> bool:
@@ -13,6 +20,93 @@ def _is_recent(date_str: str, days: int = 2) -> bool:
         return dt >= datetime.now(timezone.utc) - timedelta(days=days)
     except Exception:
         return True  # include if date unparseable
+
+
+_ARXIV_API = "https://export.arxiv.org/api/query"
+_ARXIV_RSS = "https://rss.arxiv.org/atom/"
+_ARXIV_MIN_INTERVAL = 3.0  # arXiv API terms: no more than one request every 3s
+_arxiv_last_call = 0.0
+
+
+def _arxiv_get(url: str):
+    """GET an arXiv URL, spacing calls at least _ARXIV_MIN_INTERVAL apart."""
+    global _arxiv_last_call
+    wait = _ARXIV_MIN_INTERVAL - (time.monotonic() - _arxiv_last_call)
+    if wait > 0:
+        time.sleep(wait)
+    try:
+        return requests.get(url, timeout=30)
+    finally:
+        _arxiv_last_call = time.monotonic()
+
+
+def _arxiv_title_terms(query: str) -> list[str]:
+    """Turn 'ti:foo+bar+OR+ti:baz' into ['foo bar', 'baz'] for local title matching."""
+    return [t.replace("ti:", "").replace("+", " ").strip().lower() for t in query.split("+OR+")]
+
+
+def _arxiv_rss_fallback(categories: list[str], query: str, max_results: int) -> list:
+    """Fallback when the export API keeps failing: pull today's announcement
+    feed from rss.arxiv.org (separate infrastructure from the API) and filter
+    titles locally with the same terms. Empty on weekends/holidays, since
+    arXiv doesn't announce then."""
+    terms = _arxiv_title_terms(query)
+    try:
+        resp = _arxiv_get(_ARXIV_RSS + "+".join(categories))
+        resp.raise_for_status()
+    except Exception as e:
+        logger.warning(f"arXiv RSS fallback for {categories} failed: {e}")
+        return []
+    entries = [
+        e for e in feedparser.parse(resp.content).entries
+        if e.get("arxiv_announce_type", "new") in ("new", "cross")
+        and any(t in e.title.lower() for t in terms)
+    ]
+    return entries[:max_results]
+
+
+def _arxiv_search(categories: list[str], query: str, max_results: int,
+                  attempts: int = 4, base_delay: float = 5.0) -> list:
+    """Query the arXiv export API, falling back to the RSS feed.
+
+    The API throttles bursts by answering with HTTP 406/429/503 (and, since
+    it moved to https-only, a 301 first for plain-http URLs). feedparser
+    swallows those HTTP errors and just returns a non-bozo empty feed, so the
+    old 1s/2s retry saw three silent empties and gave up. Fetching with
+    requests surfaces the status, and the longer backoff (5s, 10s, 20s) gets
+    past the throttle window."""
+    cats = "+OR+".join(f"cat:{c}" for c in categories)
+    url = (
+        f"{_ARXIV_API}?search_query=({cats})+AND+({query})"
+        f"&sortBy=submittedDate&sortOrder=descending&max_results={max_results}"
+    )
+    last_err = None
+    for attempt in range(1, attempts + 1):
+        retry_after = ""
+        try:
+            resp = _arxiv_get(url)
+            if resp.status_code == 200:
+                entries = feedparser.parse(resp.content).entries
+                if entries:
+                    return entries
+                last_err = "HTTP 200 with zero entries"
+            else:
+                last_err = f"HTTP {resp.status_code}"
+                retry_after = resp.headers.get("Retry-After", "")
+        except Exception as e:
+            last_err = e
+        if attempt < attempts:
+            delay = base_delay * (2 ** (attempt - 1))
+            if retry_after.isdigit():
+                delay = max(delay, min(int(retry_after), 60))
+            time.sleep(delay)
+    logger.warning(
+        f"arXiv API query for {categories} failed after {attempts} attempts "
+        f"({last_err}); falling back to RSS"
+    )
+    entries = _arxiv_rss_fallback(categories, query, max_results)
+    logger.info(f"arXiv RSS fallback for {categories} returned {len(entries)} entries")
+    return entries
 
 
 def fetch_arxiv(max_results: int = 25) -> list[dict]:
@@ -30,15 +124,9 @@ def fetch_arxiv(max_results: int = 25) -> list[dict]:
         "+OR+ti:coding+agent+OR+ti:software+engineering+agent+OR+ti:SWE"
         "+OR+ti:speculative+decoding+OR+ti:mixture+of+experts"
     )
-    url = (
-        f"http://export.arxiv.org/api/query"
-        f"?search_query=(cat:cs.AI+OR+cat:cs.LG)+AND+({query})"
-        f"&sortBy=submittedDate&sortOrder=descending"
-        f"&max_results={max_results}"
-    )
-    feed = parse_feed_with_retry(url)
+    entries = _arxiv_search(['cs.AI', 'cs.LG'], query, max_results)
     results = []
-    for entry in feed.entries:
+    for entry in entries:
         results.append({
             "source": "arXiv",
             "title": entry.title.replace("\n", " "),
@@ -59,15 +147,9 @@ def fetch_arxiv_robotics(max_results: int = 15) -> list[dict]:
         "+OR+ti:imitation+learning+OR+ti:teleoperation+OR+ti:quadruped"
         "+OR+ti:foundation+model+robot+OR+ti:generalist+robot"
     )
-    url = (
-        f"http://export.arxiv.org/api/query"
-        f"?search_query=cat:cs.RO+AND+({query})"
-        f"&sortBy=submittedDate&sortOrder=descending"
-        f"&max_results={max_results}"
-    )
-    feed = parse_feed_with_retry(url)
+    entries = _arxiv_search(['cs.RO'], query, max_results)
     results = []
-    for entry in feed.entries:
+    for entry in entries:
         results.append({
             "source": "arXiv (Robotics)",
             "title": entry.title.replace("\n", " "),
@@ -91,15 +173,9 @@ def fetch_arxiv_emerging(max_results: int = 15) -> list[dict]:
         "+OR+ti:world+simulation+OR+ti:computer+use+OR+ti:browser+agent"
         "+OR+ti:GUI+agent+OR+ti:A2A+OR+ti:Agent2Agent+OR+ti:agent+payments"
     )
-    url = (
-        f"http://export.arxiv.org/api/query"
-        f"?search_query=(cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.RO)+AND+({query})"
-        f"&sortBy=submittedDate&sortOrder=descending"
-        f"&max_results={max_results}"
-    )
-    feed = parse_feed_with_retry(url)
+    entries = _arxiv_search(['cs.AI', 'cs.LG', 'cs.RO'], query, max_results)
     results = []
-    for entry in feed.entries:
+    for entry in entries:
         results.append({
             "source": "arXiv",
             "title": entry.title.replace("\n", " "),

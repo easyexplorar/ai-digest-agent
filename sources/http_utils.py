@@ -52,8 +52,8 @@ def parse_feed_with_retry(url: str, request_headers: dict | None = None,
             return feed
         if attempt == attempts:
             logger.warning(
-                f"Feed parse for {url} returned no entries after {attempts} attempts: "
-                f"{feed.get('bozo_exception')}"
+                f"Feed parse for {url} returned no entries after {attempts} attempts "
+                f"(HTTP {feed.get('status')}): {feed.get('bozo_exception')}"
             )
             return feed
         time.sleep(base_delay * (2 ** (attempt - 1)))
