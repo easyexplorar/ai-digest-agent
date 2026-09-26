@@ -1,6 +1,6 @@
 # AI Digest Agent
 
-Fetches AI/agentic-systems news from arXiv, lab blogs, and community sources, ranks it with Grok (xAI) for novelty and relevance, and emails a daily markdown/PDF digest — plus a Friday weekly strategic rollup.
+Fetches AI/agentic-systems news from arXiv, TMLR (peer-reviewed), lab blogs, and community sources, ranks it with Grok (xAI) for novelty and relevance, and emails a daily markdown/PDF digest — plus a Friday weekly strategic rollup.
 
 ## Requirements
 
@@ -69,7 +69,7 @@ py -3 -m pytest -m live
 ## Project layout
 
 - `run_digest.py` — main entry point orchestrating a full run
-- `sources/` — fetchers for arXiv, lab blogs, community sources, jobs, and market data
+- `sources/` — fetchers for arXiv, TMLR, lab blogs, community sources, jobs, and market data
 - `ranker.py` — scores fetched items with Grok
 - `digest.py` — generates the daily markdown digest
 - `weekly_rollup.py` — generates the Friday strategic rollup

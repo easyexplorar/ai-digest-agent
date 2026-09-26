@@ -1,6 +1,8 @@
 """Fetchers for each data source."""
 
+import html
 import logging
+import re
 import time
 from datetime import datetime, timezone, timedelta
 
@@ -207,6 +209,52 @@ def fetch_huggingface_papers() -> list[dict]:
     return results
 
 
+_TMLR_ITEM = re.compile(r'<li class="item[^"]*">(.*?)</li>', re.S)
+_TMLR_TITLE = re.compile(r'<h4><a[^>]*><b>(.*?)</b></a></h4>', re.S)
+_TMLR_BYLINE = re.compile(r'<p><i>(.*?)</i>,\s*([A-Za-z]+ \d{4})', re.S)
+_TMLR_FORUM = re.compile(r'href="(https://openreview\.net/forum\?id=[^"]+)"')
+_TMLR_CERTS = re.compile(r'class="badge [^"]*"[^>]*>([^<]+)</a>')
+
+
+def fetch_tmlr(max_results: int = 20) -> list[dict]:
+    """Fetch the newest peer-reviewed papers from TMLR (Transactions on Machine
+    Learning Research), which accepts papers on a rolling basis rather than in
+    yearly conference batches. Scrapes TMLR's own listing on jmlr.org
+    (newest first) because OpenReview's API now answers anonymous requests
+    with a 403 browser-verification challenge. The listing has no abstracts,
+    so the summary carries authors and any TMLR certifications (Featured,
+    Outstanding, etc.) as the quality signal. Month-level dates mean the same
+    papers show up for weeks; run_digest's seen-URL filter drops repeats."""
+    try:
+        resp = get_with_retry("https://jmlr.org/tmlr/papers/", timeout=60)
+    except Exception:
+        return []
+    resp.encoding = "utf-8"  # page is UTF-8 but its header omits the charset
+
+    results = []
+    for block in _TMLR_ITEM.findall(resp.text)[:max_results]:
+        title = _TMLR_TITLE.search(block)
+        forum = _TMLR_FORUM.search(block)
+        if not (title and forum):
+            continue
+        byline = _TMLR_BYLINE.search(block)
+        authors = html.unescape(byline.group(1)).split(", ") if byline else []
+        certs = [c.strip() for c in _TMLR_CERTS.findall(block)]
+        summary = "Peer-reviewed TMLR paper"
+        if authors:
+            summary += f" by {authors[0]}" + (" et al." if len(authors) > 1 else "")
+        if certs:
+            summary += f"; certifications: {', '.join(certs)}"
+        results.append({
+            "source": "TMLR",
+            "title": " ".join(html.unescape(title.group(1)).split()),
+            "url": html.unescape(forum.group(1)),
+            "summary": summary,
+            "date": byline.group(2) if byline else "",
+        })
+    return results
+
+
 
 def fetch_github_trending() -> list[dict]:
     """Fetch trending AI/ML repos from GitHub via scraping-free RSS alternative."""
@@ -268,6 +316,7 @@ def fetch_all() -> list[dict]:
         fetch_arxiv_robotics,
         fetch_arxiv_emerging,
         fetch_huggingface_papers,
+        fetch_tmlr,
         fetch_github_trending,
         fetch_alignment_forum,
         fetch_hackernews,
