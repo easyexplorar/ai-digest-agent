@@ -1,6 +1,12 @@
+from types import SimpleNamespace
+
 import pytest
 
 from grok_utils import generate_content_with_retry
+
+
+def _chunk(text):
+    return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text))])
 
 
 class _FakeCompletions:
@@ -11,9 +17,12 @@ class _FakeCompletions:
 
     def create(self, **kwargs):
         self.calls += 1
+        self.last_kwargs = kwargs
         if self.calls <= self.fail_times:
             raise RuntimeError(f"transient failure {self.calls}")
-        return self.result
+        # Stream the result back in two pieces, like the real API.
+        half = len(self.result) // 2
+        return iter([_chunk(self.result[:half]), SimpleNamespace(choices=[]), _chunk(self.result[half:])])
 
 
 class _FakeChat:
@@ -29,8 +38,10 @@ class _FakeClient:
 def test_succeeds_on_first_attempt(monkeypatch):
     monkeypatch.setattr("grok_utils.time.sleep", lambda s: None)
     client = _FakeClient(fail_times=0, result="response")
-    assert generate_content_with_retry(client) == "response"
+    result = generate_content_with_retry(client, model="m")
+    assert result.choices[0].message.content == "response"
     assert client.chat.completions.calls == 1
+    assert client.chat.completions.last_kwargs == {"stream": True, "model": "m"}
 
 
 def test_retries_and_eventually_succeeds(monkeypatch):
@@ -40,7 +51,7 @@ def test_retries_and_eventually_succeeds(monkeypatch):
 
     result = generate_content_with_retry(client, attempts=3, base_delay=1.0)
 
-    assert result == "response"
+    assert result.choices[0].message.content == "response"
     assert client.chat.completions.calls == 3
     assert sleeps == [1.0, 2.0]  # exponential backoff
 
@@ -53,3 +64,14 @@ def test_raises_after_exhausting_all_attempts(monkeypatch):
         generate_content_with_retry(client, attempts=3, base_delay=0.01)
 
     assert client.chat.completions.calls == 3
+
+
+def test_rank_items_raises_when_every_chunk_fails(monkeypatch):
+    import ranker
+
+    def boom(*a, **k):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(ranker, "_rank_chunk", boom)
+    with pytest.raises(RuntimeError, match="All .* ranking chunks failed"):
+        ranker.rank_items([{"title": "x"}] * 3, api_key="k")

@@ -30,7 +30,7 @@ from tracker import (
 from frontier_voices import tag_frontier_voices
 from notify import save_digest, send_windows_notification
 from weekly_rollup import is_friday, generate_weekly_rollup
-from email_sender import send_digest_email, send_rollup_email
+from email_sender import send_digest_email, send_rollup_email, send_alert_email
 from retention import prune_output
 
 load_dotenv()
@@ -201,6 +201,34 @@ def main():
     logger.info("=== Run finished ===")
 
 
+def alert_crash(exc: Exception) -> None:
+    """Surface a crashed run — otherwise it only reaches the log and looks
+    like a digest that simply never arrived. Alerts go to ALERT_EMAIL
+    (default: first EMAIL_TO address), never the full recipient list."""
+    summary = f"{type(exc).__name__}: {exc}"
+    try:
+        send_windows_notification("AI Digest FAILED", summary)
+    except Exception as e:
+        logger.warning(f"Crash toast failed: {e}")
+
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    alert_to  = os.getenv("ALERT_EMAIL") or (os.getenv("EMAIL_TO") or "").split(",")[0].strip()
+    if not (smtp_user and smtp_pass and alert_to):
+        return
+    try:
+        send_alert_email(
+            os.getenv("SMTP_HOST", "127.0.0.1"), int(os.getenv("SMTP_PORT", "1025")),
+            smtp_user, smtp_pass, alert_to,
+            f"AI Digest run FAILED — {date.today().strftime('%d %b %Y')}",
+            f"Today's digest run crashed and no digest was sent.\n\n{summary}\n\n"
+            f"See logs/digest.log for the full traceback.",
+        )
+        logger.info(f"Crash alert emailed to {alert_to}.")
+    except Exception as e:
+        logger.warning(f"Crash alert email failed: {e}")
+
+
 if __name__ == "__main__":
     try:
         main()
@@ -208,5 +236,5 @@ if __name__ == "__main__":
         raise
     except Exception as e:
         logger.exception("Run crashed with an unhandled exception.")
-        send_windows_notification("AI Digest FAILED", f"Run crashed: {e}")
+        alert_crash(e)
         raise

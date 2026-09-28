@@ -109,6 +109,7 @@ def rank_items(items: list[dict], api_key: str) -> list[dict]:
     discipline_map: dict[int, str] = {}
 
     chunks = [items[i:i + CHUNK_SIZE] for i in range(0, len(items), CHUNK_SIZE)]
+    failed = 0
     for chunk_idx, chunk in enumerate(chunks):
         offset = chunk_idx * CHUNK_SIZE
         try:
@@ -117,8 +118,19 @@ def rank_items(items: list[dict], api_key: str) -> list[dict]:
             reason_map.update(rm)
             discipline_map.update(dm)
         except Exception as e:
+            failed += 1
             print(f"    [warning] ranking chunk {chunk_idx + 1}/{len(chunks)} failed: {e}")
             logger.warning(f"ranking chunk {chunk_idx + 1}/{len(chunks)} failed after retries: {e}")
+
+    # Unscored items all tie at 0, so a digest built on them is effectively
+    # unranked — fail loudly rather than email it.
+    if chunks and failed == len(chunks):
+        raise RuntimeError(f"All {failed} ranking chunks failed; refusing to build an unranked digest.")
+    if failed:
+        logger.error(
+            f"{failed}/{len(chunks)} ranking chunks failed — "
+            f"{sum(len(c) for c in chunks) - len(score_map)} items left unscored."
+        )
 
     for i, item in enumerate(items):
         item["score"]      = score_map.get(i, 0)

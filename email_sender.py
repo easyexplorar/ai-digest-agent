@@ -253,6 +253,31 @@ def send_email(
     return True
 
 
+def send_alert_email(
+    smtp_host: str,
+    smtp_port: int,
+    smtp_user: str,
+    smtp_pass: str,
+    to_addr: str,
+    subject: str,
+    body_text: str,
+) -> None:
+    """Plain-text operator alert (no PDF). Fewer connect retries than the
+    digest so a crash alert can't hang the run for minutes."""
+    ctx = ssl.create_default_context()
+    if smtp_host in ("127.0.0.1", "localhost", "::1"):
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+    with _connect_with_retry(smtp_host, smtp_port, smtp_user, smtp_pass, ctx, 2, 10.0) as server:
+        msg = EmailMessage()
+        msg["From"] = smtp_user
+        msg["To"] = to_addr
+        msg["Subject"] = subject
+        msg.set_content(body_text)
+        server.send_message(msg)
+
+
 def send_digest_email(
     smtp_host: str,
     smtp_port: int,
