@@ -30,6 +30,7 @@ Fetches AI/agentic-systems news from arXiv, TMLR (peer-reviewed), lab blogs, and
    | `SMTP_HOST`, `SMTP_PORT` | No | SMTP server for emailing digests. Defaults assume a local Proton Mail Bridge (`127.0.0.1`, port `1025` is Bridge's common default) — `1025` is configurable, so check your own Bridge app's SMTP/IMAP settings for the actual port |
    | `SMTP_USER`, `SMTP_PASS` | No | SMTP credentials. If unset, email delivery is skipped and the digest is only saved locally |
    | `EMAIL_TO` | No | Recipient address for the daily digest and weekly rollup |
+   | `ALERT_EMAIL` | No | Where crash alerts go (default: the first `EMAIL_TO` address). Alerts never go to the full recipient list |
    | `LOGO_PATH` | No | Path to a logo image for the PDF header (falls back to a text wordmark) |
    | `BRAND_NAME` | No | Wordmark text shown when no `LOGO_PATH` is set (default `AI Digest`) |
    | `REPORT_DISCLAIMER` | No | Footer disclaimer text on the PDF report |
@@ -44,7 +45,7 @@ Run a single digest cycle (fetch → rank → summarize → save → email → n
 py -3 run_digest.py
 ```
 
-Output lands in `output/` as a dated markdown digest and a JSON snapshot; on Fridays a weekly rollup is also generated. On Windows, a toast notification reports success or failure.
+Output lands in `output/` as a dated markdown digest and a JSON snapshot; on Fridays a weekly rollup is also generated. On Windows, a toast notification reports success or failure; if a run crashes, a short alert email is also sent to `ALERT_EMAIL`.
 
 ## Scheduling (Windows Task Scheduler)
 
@@ -65,6 +66,23 @@ Tests marked `live` hit real external APIs/services and are excluded by default 
 ```
 py -3 -m pytest -m live
 ```
+
+## Troubleshooting
+
+### `APIConnectionError: Connection error` / "Server disconnected without sending a response"
+
+Short Grok calls succeed, but ranking chunks and digest generation fail after ~10–35s, and the run crashes before emailing.
+
+**Cause:** something on the network path — typically a VPN server that relays `api.x.ai` connections — drops connections that sit idle too long. A non-streamed completion sends no bytes until the whole response is ready, so long generations look idle.
+
+**Mitigation (built in):** all Grok calls are streamed (`grok_utils.py`), which keeps data flowing, and retried with backoff.
+
+**If it still happens:**
+1. Check what `api.x.ai` resolves to: `nslookup api.x.ai`. A private address (e.g. `10.x.x.x`) means your VPN is relaying the connection itself rather than passing it through.
+2. Switch VPN server/protocol, or exclude `api.x.ai` from the tunnel — then it should resolve to a public (Cloudflare) address.
+3. Check `logs/digest.log` for the `Grok call attempt` warnings to confirm.
+
+Keep retry budgets within the scheduled task's 10-minute `ExecutionTimeLimit` (`schedule_task.ps1`), or a stuck run is killed before its crash alert can fire.
 
 ## Project layout
 
