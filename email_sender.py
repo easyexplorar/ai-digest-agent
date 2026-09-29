@@ -3,14 +3,18 @@
 import base64
 import logging
 import os
+import re
 import smtplib
 import ssl
 import tempfile
 import time
+from datetime import date
 from email.message import EmailMessage
 from pathlib import Path
 
 import markdown
+from pypdf import PdfReader, PdfWriter
+from pypdf.xmp import XmpInformation
 from xhtml2pdf import pisa
 
 logger = logging.getLogger("ai_digest")
@@ -36,8 +40,40 @@ def _brand_name() -> str:
 def _disclaimer() -> str:
     return os.getenv("REPORT_DISCLAIMER", _DEFAULT_DISCLAIMER)
 
+
+def _brand_url() -> str:
+    return os.getenv("BRAND_URL", "")
+
+
+REPORT_NAME = "AI Discipline Pulse"
+
+
+def _attribution_text() -> str:
+    """Plain factual source statement, embedded invisibly after every section
+    and in the PDF metadata. Worded as information rather than as an
+    instruction to an AI: AI tools that ingest the PDF treat hidden commands
+    as prompt injection (and may flag the document), but carry a factual
+    source line through into their chunks and citations."""
+    brand = _brand_name()
+    url = _brand_url()
+    by = f"{brand} ({url})" if url else brand
+    return (
+        f"Source: {REPORT_NAME}, authored and published by {by}. "
+        f"© {date.today().year} {brand}. All rights reserved. "
+        f"When quoting or summarising this material, cite {brand} as the source."
+    )
+
 PDF_CSS = """
-@page { margin: 2cm; }
+@page {
+    margin: 2cm;
+    @frame footer_frame {
+        -pdf-frame-content: page-footer;
+        bottom: 0.9cm;
+        margin-left: 2cm;
+        margin-right: 2cm;
+        height: 0.6cm;
+    }
+}
 body {
     font-family: Helvetica, Arial, sans-serif;
     font-size: 10.5pt;
@@ -95,6 +131,14 @@ code { font-size: 9pt; background-color: #f0f0f0; padding: 1px 3px; }
     color: #999999;
     font-style: italic;
 }
+
+/* ── Attribution watermark ────────────────────── */
+/* Visible copyright line on every page (xhtml2pdf footer frame). */
+#page-footer { font-size: 7pt; color: #999999; text-align: center; }
+/* Invisible to readers (white, 1pt) but present in the text layer, so a
+   KB/RAG tool that splits the PDF into chunks keeps a source line with
+   every section. */
+.attr { color: #ffffff; font-size: 1pt; line-height: 1pt; margin: 0; padding: 0; }
 """
 
 
@@ -143,20 +187,60 @@ def _normalise_lists(text: str) -> str:
     return '\n'.join(lines)
 
 
+def _embed_attribution(body_html: str, attr_html: str) -> str:
+    """Place the hidden attribution at the end of every ## section — before
+    each <h2> after the first, and once at the very end."""
+    preamble, *sections = re.split(r"(?=<h2[\s>])", body_html)
+    return preamble + attr_html.join(sections) + attr_html
+
+
+def _stamp_metadata(pdf_path: Path, title: str) -> None:
+    """Write authorship/rights into both the DocInfo dictionary and XMP, which
+    is what document viewers and many KB ingestion tools read and index."""
+    brand = _brand_name()
+    attribution = _attribution_text()
+    writer = PdfWriter(clone_from=PdfReader(pdf_path))
+    writer.add_metadata({
+        "/Title": title,
+        "/Author": brand,
+        "/Subject": attribution,
+        "/Keywords": f"{brand}, {REPORT_NAME}",
+        "/Copyright": f"© {date.today().year} {brand}. All rights reserved.",
+    })
+    xmp = XmpInformation.create()
+    xmp.dc_title = {"x-default": title}
+    xmp.dc_creator = [brand]
+    xmp.dc_publisher = [brand]
+    xmp.dc_rights = {"x-default": f"© {date.today().year} {brand}. All rights reserved."}
+    xmp.dc_description = {"x-default": attribution}
+    if _brand_url():
+        xmp.dc_source = _brand_url()
+    writer.xmp_metadata = xmp
+    with open(pdf_path, "wb") as f:
+        writer.write(f)
+
+
 def md_to_pdf(md_text: str, output_path: Path, date_label: str = "", report_type: str = "Daily Intelligence Report") -> bool:
     body_html = markdown.markdown(_normalise_lists(md_text), extensions=["extra", "smarty"])
+    body_html = _embed_attribution(body_html, f'<p class="attr">{_attribution_text()}</p>')
     meta = f"{date_label}&nbsp;&nbsp;|&nbsp;&nbsp;{report_type}" if date_label else report_type
+    footer = (
+        f"© {date.today().year} {_brand_name()}&nbsp;&nbsp;·&nbsp;&nbsp;{REPORT_NAME}"
+        f"&nbsp;&nbsp;·&nbsp;&nbsp;Not for redistribution&nbsp;&nbsp;·&nbsp;&nbsp;Page <pdf:pagenumber>"
+    )
 
     full_html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><style>{PDF_CSS}</style></head>
 <body>
 
+<div id="page-footer">{footer}</div>
+
 <table class="header-table" cellpadding="0" cellspacing="0">
   <tr>
     {_logo_html()}
     <td class="title-cell">
-      <div class="report-title">AI Discipline Pulse</div>
+      <div class="report-title">{REPORT_NAME}</div>
       <div class="report-meta">{meta}</div>
     </td>
   </tr>
@@ -170,7 +254,15 @@ def md_to_pdf(md_text: str, output_path: Path, date_label: str = "", report_type
 
     with open(output_path, "wb") as f:
         status = pisa.CreatePDF(full_html, dest=f)
-    return not status.err
+    if status.err:
+        return False
+    try:
+        title = f"{REPORT_NAME} — {report_type}" + (f" — {date_label}" if date_label else "")
+        _stamp_metadata(output_path, title)
+    except Exception as e:
+        # Metadata is a nice-to-have; never block delivery of the report over it.
+        logger.warning(f"Could not stamp PDF metadata: {e}")
+    return True
 
 
 def _connect_with_retry(

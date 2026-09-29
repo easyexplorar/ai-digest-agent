@@ -4,7 +4,9 @@ import pytest
 from PIL import Image
 
 import email_sender
-from email_sender import _normalise_lists, _logo_html, md_to_pdf, send_email
+from pypdf import PdfReader
+
+from email_sender import _embed_attribution, _normalise_lists, _logo_html, md_to_pdf, send_email
 
 
 # ── _normalise_lists ─────────────────────────────────────────────────────
@@ -70,6 +72,35 @@ def test_md_to_pdf_produces_valid_pdf(monkeypatch, tmp_path):
     assert ok is True
     assert output_path.exists()
     assert output_path.read_bytes()[:5] == b"%PDF-"
+
+
+def test_embed_attribution_closes_every_section():
+    html = "<p>intro</p><h2>A</h2><p>a</p><h2>B</h2><p>b</p>"
+    out = _embed_attribution(html, "[X]")
+    assert out == "<p>intro</p><h2>A</h2><p>a</p>[X]<h2>B</h2><p>b</p>[X]"
+
+
+def test_embed_attribution_without_sections():
+    assert _embed_attribution("<p>x</p>", "[X]") == "<p>x</p>[X]"
+
+
+def test_md_to_pdf_embeds_attribution_and_metadata(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOGO_PATH", str(tmp_path / "does_not_exist.png"))
+    monkeypatch.setenv("BRAND_NAME", "Acme Corp")
+    monkeypatch.setenv("BRAND_URL", "https://acme.example")
+    output_path = tmp_path / "out.pdf"
+
+    ok = md_to_pdf("## One\n\nalpha\n\n## Two\n\nbeta", output_path, date_label="14 Aug 2026")
+    assert ok is True
+
+    reader = PdfReader(output_path)
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert text.count("authored and published by Acme Corp (https://acme.example)") == 2
+    assert "Not for redistribution" in text
+    assert reader.metadata.author == "Acme Corp"
+    assert "Acme Corp" in reader.metadata["/Copyright"]
+    assert reader.xmp_metadata.dc_creator == ["Acme Corp"]
+    assert "Acme Corp" in reader.xmp_metadata.dc_rights["x-default"]
 
 
 # ── send_email TLS gating (fix from earlier session: only skip cert
