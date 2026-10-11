@@ -49,7 +49,7 @@ Output lands in `output/` as a dated markdown digest and a JSON snapshot; on Fri
 
 ## Scheduling (Windows Task Scheduler)
 
-Register a recurring job that runs Mon–Fri at 07:00 (assumes the machine clock is set to CST/UTC+8 — adjust `$RunAt` in the script otherwise):
+Register a recurring job that runs Mon–Fri at 10:00 local (CST/UTC+8 — adjust `$RunAt` in the script otherwise):
 ```
 # Run as Administrator
 .\schedule_task.ps1
