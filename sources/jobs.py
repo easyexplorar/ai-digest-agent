@@ -119,3 +119,23 @@ def fetch_ai_jobs() -> list[dict]:
     for slug, name in LEVER_COMPANIES:
         results.extend(_fetch_lever(slug, name))
     return results
+
+
+def format_jobs_context(jobs: list[dict], top_n: int = 15) -> str:
+    """Compact hiring lines for the Skills Gap prompt, not the ranking pipeline.
+
+    Shape: ``Company — Title (Location) — URL``. At most ``top_n`` lines.
+    An empty list becomes a fixed fallback so the model does not invent openings.
+    """
+    if not jobs:
+        return "No recent AI job postings available."
+    lines = []
+    for job in jobs[:top_n]:
+        company = job.get("company", "")
+        title = job.get("title", "")
+        location = (job.get("location") or "").strip()
+        url = (job.get("url") or "").strip()
+        where = f" ({location})" if location else ""
+        link = f" — {url}" if url else ""
+        lines.append(f"{company} — {title}{where}{link}")
+    return "\n".join(lines)
