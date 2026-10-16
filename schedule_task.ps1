@@ -14,7 +14,9 @@ $RunAt      = "10:00"
 $Action  = New-ScheduledTaskAction -Execute $PythonExe -Argument "`"$Script`"" -WorkingDirectory $ProjectDir
 $Trigger = New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 `
            -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At $RunAt
-$Settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 10) `
+# 30 min: a normal run takes ~3 min, but arXiv retries alone have taken ~7 min,
+# and on Fridays the weekly rollup runs after the daily digest in the same run.
+$Settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
             -StartWhenAvailable -MultipleInstances IgnoreNew
 
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -RunLevel Limited -Force
