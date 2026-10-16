@@ -1,6 +1,7 @@
 """Persist daily ranked snapshots and compute trend deltas and discipline tallies."""
 
 import json
+import re
 from collections import Counter
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -129,6 +130,35 @@ def format_china_context(ranked_items: list[dict], top_n: int = 5) -> str:
         f"- [{i['source']}] {i['title']} — {i.get('reason', '')} ({i['url']})"
         for i in china_items
     )
+
+
+NUMBERS_SECTION = "## The Numbers Behind the News"
+CONCEPT_LINE = re.compile(r"^\*{0,2}Concept:\*{0,2}\s*(.+?)\s*$", re.M)
+
+
+def recent_number_concepts(output_dir: str = "output", days: int = 30) -> list[str]:
+    """Return the concepts covered by the Numbers Behind the News section in
+    the past N days' saved digests, newest first and deduped, so the prompt
+    can steer away from repeating them. Reads the digest_*.md files that are
+    already kept for 30 days rather than a separate state file."""
+    cutoff = (date.today() - timedelta(days=days)).strftime("%Y%m%d")
+    concepts: list[str] = []
+    for path in sorted(Path(output_dir).glob("digest_*.md"), reverse=True):
+        stamp = path.stem.removeprefix("digest_")[:8]
+        if not stamp.isdigit() or stamp < cutoff:
+            continue
+        text = path.read_text(encoding="utf-8")
+        section = text.partition(NUMBERS_SECTION)[2].split("\n## ", 1)[0]
+        match = CONCEPT_LINE.search(section)
+        if match:
+            concept = match.group(1).strip("*[] ")
+            if concept and concept.lower() not in (c.lower() for c in concepts):
+                concepts.append(concept)
+    return concepts
+
+
+def format_recent_concepts(concepts: list[str]) -> str:
+    return ", ".join(concepts) if concepts else "None yet."
 
 
 def format_frontier_context(ranked_items: list[dict], top_n: int = 5) -> str:

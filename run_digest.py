@@ -26,6 +26,7 @@ from tracker import (
     save_snapshot, save_seen_urls, load_yesterday, load_seen_urls,
     discipline_tally, trend_delta,
     format_tally_text, format_delta_text, format_china_context, format_frontier_context,
+    recent_number_concepts, format_recent_concepts,
 )
 from frontier_voices import tag_frontier_voices
 from notify import save_digest, send_windows_notification
@@ -93,6 +94,7 @@ def main():
 
     china_txt = format_china_context(ranked)
     frontier_txt = format_frontier_context(ranked)
+    concepts_txt = format_recent_concepts(recent_number_concepts())
 
     # ── Market signals ─────────────────────────────────────────────────────
     console.print("  Fetching market data...")
@@ -112,6 +114,7 @@ def main():
         market_context=market_txt,
         china_context=china_txt,
         frontier_context=frontier_txt,
+        recent_concepts=concepts_txt,
     )
     logger.info("Digest generated.")
 

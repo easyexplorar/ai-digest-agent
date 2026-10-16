@@ -6,6 +6,7 @@ from tracker import (
     save_seen_urls, load_seen_urls,
     discipline_tally, trend_delta,
     format_tally_text, format_delta_text, format_china_context, format_frontier_context,
+    recent_number_concepts, format_recent_concepts,
 )
 
 
@@ -177,3 +178,45 @@ def test_format_frontier_context_caps_at_top_n():
     ]
     text = format_frontier_context(ranked, top_n=3)
     assert text.count("Item") == 3
+
+
+def _write_digest(tmp_path, d, concept_line, suffix="0900"):
+    text = (
+        "## Skills Gap: What to Learn\n\n- **Skill:** text\n\n"
+        "## The Numbers Behind the News\n\n"
+        f"{concept_line}\n\n**The number:** 95% accuracy.\n\n"
+        "## The Big Picture\n\nConcept: not this one.\n"
+    )
+    (tmp_path / f"digest_{d.strftime('%Y%m%d')}_{suffix}.md").write_text(text, encoding="utf-8")
+
+
+def test_recent_number_concepts_newest_first_and_deduped(tmp_path):
+    today = date.today()
+    _write_digest(tmp_path, today - timedelta(days=1), "**Concept:** Base rates")
+    _write_digest(tmp_path, today - timedelta(days=2), "**Concept:** Margin of error")
+    _write_digest(tmp_path, today - timedelta(days=3), "**Concept:** base rates")
+    assert recent_number_concepts(str(tmp_path)) == ["Base rates", "Margin of error"]
+
+
+def test_recent_number_concepts_tolerates_unbolded_label(tmp_path):
+    _write_digest(tmp_path, date.today(), "Concept: Calibration")
+    assert recent_number_concepts(str(tmp_path)) == ["Calibration"]
+
+
+def test_recent_number_concepts_skips_old_and_sectionless_digests(tmp_path):
+    _write_digest(tmp_path, date.today() - timedelta(days=40), "**Concept:** Selection bias")
+    (tmp_path / f"digest_{date.today().strftime('%Y%m%d')}_1000.md").write_text(
+        "## The Big Picture\n\nConcept: none.\n", encoding="utf-8"
+    )
+    (tmp_path / "digest_notes.md").write_text("junk", encoding="utf-8")
+    assert recent_number_concepts(str(tmp_path)) == []
+
+
+def test_recent_number_concepts_ignores_skip_day(tmp_path):
+    _write_digest(tmp_path, date.today(), "No headline numbers worth unpacking today.")
+    assert recent_number_concepts(str(tmp_path)) == []
+
+
+def test_format_recent_concepts():
+    assert format_recent_concepts([]) == "None yet."
+    assert format_recent_concepts(["Base rates", "Calibration"]) == "Base rates, Calibration"

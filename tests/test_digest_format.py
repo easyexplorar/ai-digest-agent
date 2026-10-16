@@ -28,3 +28,32 @@ def test_only_touches_labelled_sections():
 
 def test_skills_gap_stays_a_labelled_section():
     assert "## Skills Gap: What to Learn" in _LABELLED_SECTIONS
+
+
+def test_prompt_has_numbers_section_before_big_picture():
+    from digest import DIGEST_PROMPT
+    from tracker import NUMBERS_SECTION
+    assert NUMBERS_SECTION in DIGEST_PROMPT
+    assert DIGEST_PROMPT.index(NUMBERS_SECTION) < DIGEST_PROMPT.index("## The Big Picture")
+    assert "{recent_concepts}" in DIGEST_PROMPT
+
+
+def test_drops_unfilled_numbers_section_with_header():
+    from digest import _drop_empty_numbers_section
+    text = (
+        "## Skills Gap: What to Learn\n\n- **Skill:** text\n\n"
+        "## The Numbers Behind the News\nNo headline numbers worth unpacking today.\n\n"
+        "## The Big Picture\n\nSummary.\n"
+    )
+    out = _drop_empty_numbers_section(text)
+    assert "Numbers Behind" not in out
+    assert "## Skills Gap" in out and "## The Big Picture\n\nSummary." in out
+
+
+def test_keeps_filled_numbers_section():
+    from digest import _drop_empty_numbers_section
+    text = (
+        "## The Numbers Behind the News\n\n**Concept:** Base rates\n\n"
+        "**The number:** 95%.\n\n## The Big Picture\n\nSummary.\n"
+    )
+    assert _drop_empty_numbers_section(text) == text

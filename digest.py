@@ -5,6 +5,7 @@ import re
 from openai import OpenAI
 
 from grok_utils import generate_content_with_retry
+from tracker import NUMBERS_SECTION, CONCEPT_LINE
 
 MODEL = "grok-4-fast"
 
@@ -164,6 +165,28 @@ End with exactly one leadership bullet only when today's stories warrant it; oth
 - **For leaders hiring this week:** [One concrete screen or interview signal grounded in today's news.]
 
 
+## The Numbers Behind the News
+
+Pick ONE number or numerical claim from today's material — an accuracy rate, test score, error or failure rate, survey result, forecast, "X times better" claim, or a stock move from the market data — and explain the probability or statistics idea a reader needs to judge it. Plain English, no formulas, no Greek letters.
+
+Look in this order and use the first good number you find: the Top Stories, then Also Worth Knowing and the rest of the source material below, then the market data in Capital Markets Lens (e.g. whether a 2–3% one-day move is meaningful or mostly noise).
+
+Never do your own calculations and never invent figures: quote only numbers that appear in the source material or market data, and explain the idea in words. Pick a concept different from the recently covered ones listed below, unless today's number genuinely needs one of them.
+
+If none of that material contains a number worth unpacking, write only: No headline numbers worth unpacking today.
+
+**Concept:** [Short plain name, e.g. "Base rates", "Margin of error", "Calibration", "Selection bias", "Relative vs absolute risk"]
+
+**The number:** [The figure exactly as reported, and which story it came from.]
+
+**What it really tells you:** [2–3 sentences explaining the idea in plain English and what the number does and doesn't show.]
+
+**How to read claims like this:** [One sentence the reader can reuse the next time they see a similar claim.]
+
+Recently covered concepts (avoid repeating):
+{recent_concepts}
+
+
 ## The Big Picture
 
 2–3 plain sentences. Step back from today's news: what direction is AI heading based on these signals? What should a non-technical reader take away for the week ahead? No jargon. No buzzwords.
@@ -190,6 +213,17 @@ def _bold_bullet_labels(text: str) -> str:
     )
 
 
+def _drop_empty_numbers_section(text: str) -> str:
+    """Remove the Numbers Behind the News section (header included) when the
+    model didn't fill it — a "nothing today" line under a lone header reads
+    as an empty section in the PDF. A filled section always has a Concept line."""
+    parts = re.split(r"(?m)^(?=## )", text)
+    return "".join(
+        part for part in parts
+        if not (part.startswith(NUMBERS_SECTION) and not CONCEPT_LINE.search(part))
+    )
+
+
 def generate_digest(
     ranked_items: list[dict],
     api_key: str,
@@ -199,6 +233,7 @@ def generate_digest(
     market_context: str = "",
     china_context: str = "",
     frontier_context: str = "",
+    recent_concepts: str = "",
 ) -> str:
     """Generate a markdown digest from the top N ranked items."""
     client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
@@ -221,10 +256,12 @@ def generate_digest(
         market_context=market_context or "Market data unavailable.",
         china_context=china_context or "No Chinese lab or robotics items detected today.",
         frontier_context=frontier_context or "No frontier-lab-founder items detected today.",
+        recent_concepts=recent_concepts or "None yet.",
     )
     response = generate_content_with_retry(
         client,
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
     )
-    return _bold_bullet_labels(response.choices[0].message.content.strip())
+    text = _bold_bullet_labels(response.choices[0].message.content.strip())
+    return _drop_empty_numbers_section(text)
