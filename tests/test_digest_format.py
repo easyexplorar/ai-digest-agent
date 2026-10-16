@@ -39,21 +39,45 @@ def test_prompt_has_numbers_section_before_big_picture():
 
 
 def test_drops_unfilled_numbers_section_with_header():
-    from digest import _drop_empty_numbers_section
+    from digest import _drop_bad_numbers_section
     text = (
         "## Skills Gap: What to Learn\n\n- **Skill:** text\n\n"
         "## The Numbers Behind the News\nNo headline numbers worth unpacking today.\n\n"
         "## The Big Picture\n\nSummary.\n"
     )
-    out = _drop_empty_numbers_section(text)
+    out = _drop_bad_numbers_section(text)
     assert "Numbers Behind" not in out
     assert "## Skills Gap" in out and "## The Big Picture\n\nSummary." in out
 
 
 def test_keeps_filled_numbers_section():
-    from digest import _drop_empty_numbers_section
+    from digest import _drop_bad_numbers_section
     text = (
         "## The Numbers Behind the News\n\n**Concept:** Base rates\n\n"
         "**The number:** 95%.\n\n## The Big Picture\n\nSummary.\n"
     )
-    assert _drop_empty_numbers_section(text) == text
+    assert _drop_bad_numbers_section(text) == text
+
+
+def test_drops_numbers_section_with_invented_threshold():
+    from digest import _drop_bad_numbers_section
+    text = (
+        "## The Numbers Behind the News\n\n**Concept:** Daily price move\n\n"
+        "**The number:** ARM rose 2.8% and ORCL rose 3.0% (market data).\n\n"
+        "**What it really tells you:** A gain of roughly 3.0% is common.\n\n"
+        "**How to read claims like this:** Treat any one-day move under 5% as noise.\n\n"
+        "## The Big Picture\n\nSummary.\n"
+    )
+    assert "Numbers Behind" not in _drop_bad_numbers_section(text)
+
+
+def test_keeps_numbers_section_that_reuses_quoted_figure():
+    from digest import _drop_bad_numbers_section
+    text = (
+        "## The Numbers Behind the News\n\n**Concept:** Base rates\n\n"
+        "**The number:** The model flagged 95% of fraud cases.\n\n"
+        "**What it really tells you:** Catching 95% of fraud says nothing about false alarms.\n\n"
+        "**How to read claims like this:** Ask how often it is wrong, not just right.\n\n"
+        "## The Big Picture\n\nSummary.\n"
+    )
+    assert _drop_bad_numbers_section(text) == text

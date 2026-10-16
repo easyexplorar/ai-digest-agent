@@ -1,5 +1,6 @@
 """Generates the daily digest summary using Grok."""
 
+import logging
 import re
 
 from openai import OpenAI
@@ -8,6 +9,7 @@ from grok_utils import generate_content_with_retry
 from tracker import NUMBERS_SECTION, CONCEPT_LINE
 
 MODEL = "grok-4-fast"
+logger = logging.getLogger("ai_digest")
 
 
 DIGEST_PROMPT = """You are writing a daily AI briefing for a smart, curious business reader who is NOT a programmer or academic. They care about what's happening in AI and what it means for the world — but they switch off the moment they see jargon.
@@ -169,9 +171,9 @@ End with exactly one leadership bullet only when today's stories warrant it; oth
 
 Pick ONE number or numerical claim from today's material — an accuracy rate, test score, error or failure rate, survey result, forecast, "X times better" claim, or a stock move from the market data — and explain the probability or statistics idea a reader needs to judge it. Plain English, no formulas, no Greek letters.
 
-Look in this order and use the first good number you find: the Top Stories, then Also Worth Knowing and the rest of the source material below, then the market data in Capital Markets Lens (e.g. whether a 2–3% one-day move is meaningful or mostly noise).
+Look in this order and use the first good number you find: the Top Stories, then Also Worth Knowing and the rest of the source material below, then the market data in Capital Markets Lens (e.g. whether a single day's stock move is meaningful or mostly noise).
 
-Never do your own calculations and never invent figures: quote only numbers that appear in the source material or market data, and explain the idea in words. Pick a concept different from the recently covered ones listed below, unless today's number genuinely needs one of them.
+Never do your own calculations and never invent figures: quote only numbers that appear in the source material or market data, and explain the idea in words. The ONLY numbers allowed in this section are the ones quoted in "The number" line. "What it really tells you" and "How to read claims like this" must contain no digits, percentages, thresholds, or rules of thumb with numbers in them — say "a small daily move" or "a big gap", never "under 5%" or "more than 2 points". Pick a concept different from the recently covered ones listed below, unless today's number genuinely needs one of them.
 
 If none of that material contains a number worth unpacking, write only: No headline numbers worth unpacking today.
 
@@ -213,14 +215,34 @@ def _bold_bullet_labels(text: str) -> str:
     )
 
 
-def _drop_empty_numbers_section(text: str) -> str:
+_NUMBER_LINE = re.compile(r"^\*{0,2}The number:\*{0,2}(.*)$", re.M)
+_FIGURE = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def _numbers_section_ok(section: str) -> bool:
+    """A usable Numbers section has a Concept line, and every figure in it
+    appears in "The number" line — the model sometimes adds made-up rules
+    of thumb ("treat moves under 5% as noise") despite the prompt."""
+    if not CONCEPT_LINE.search(section):
+        logger.info("Numbers Behind the News dropped: no usable number today.")
+        return False
+    quoted = _NUMBER_LINE.search(section)
+    allowed = set(_FIGURE.findall(quoted.group(1))) if quoted else set()
+    invented = set(_FIGURE.findall(_NUMBER_LINE.sub("", section))) - allowed
+    if invented:
+        logger.warning(f"Numbers Behind the News dropped: invented figures {sorted(invented)}.")
+        return False
+    return True
+
+
+def _drop_bad_numbers_section(text: str) -> str:
     """Remove the Numbers Behind the News section (header included) when the
     model didn't fill it — a "nothing today" line under a lone header reads
-    as an empty section in the PDF. A filled section always has a Concept line."""
+    as an empty section in the PDF — or when it contains invented figures."""
     parts = re.split(r"(?m)^(?=## )", text)
     return "".join(
         part for part in parts
-        if not (part.startswith(NUMBERS_SECTION) and not CONCEPT_LINE.search(part))
+        if not part.startswith(NUMBERS_SECTION) or _numbers_section_ok(part)
     )
 
 
@@ -264,4 +286,4 @@ def generate_digest(
         messages=[{"role": "user", "content": prompt}],
     )
     text = _bold_bullet_labels(response.choices[0].message.content.strip())
-    return _drop_empty_numbers_section(text)
+    return _drop_bad_numbers_section(text)
