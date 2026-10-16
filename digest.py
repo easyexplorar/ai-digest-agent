@@ -157,16 +157,11 @@ What today's AI news means for people's jobs and skills. Ground every point in t
 
 Then 3–5 specific skills worth building now, one bullet each. Prefer role families beyond engineers (product, ops, recruiting/HR, managers, consultants) when the story supports it.
 
-When the hiring data below shows a matching role family at a named company, add a short demand note. If that data is empty or unrelated, omit the note — never invent openings. Use the hiring data only for those notes in this section.
-
-- **[Specific skill]:** [Who should learn it and why today's news makes it matter.] [Optional: Demand: …] *Start by:* [one concrete first step.]
+- **[Specific skill — e.g. "Writing clear instructions and test cases for AI coding assistants", not "AI literacy"]:** [Who should learn it (role or profession) and why today's news makes it matter.] *Start by:* [one concrete first step — a free course, tool to try, or small practice project.]
 
 End with exactly one leadership bullet only when today's stories warrant it; otherwise omit it:
 
 - **For leaders hiring this week:** [One concrete screen or interview signal grounded in today's news.]
-
-Use this hiring data:
-{jobs_context}
 
 
 ## The Big Picture
@@ -204,7 +199,6 @@ def generate_digest(
     market_context: str = "",
     china_context: str = "",
     frontier_context: str = "",
-    jobs_context: str = "",
 ) -> str:
     """Generate a markdown digest from the top N ranked items."""
     client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
@@ -227,7 +221,6 @@ def generate_digest(
         market_context=market_context or "Market data unavailable.",
         china_context=china_context or "No Chinese lab or robotics items detected today.",
         frontier_context=frontier_context or "No frontier-lab-founder items detected today.",
-        jobs_context=jobs_context or "No recent AI job postings available.",
     )
     response = generate_content_with_retry(
         client,

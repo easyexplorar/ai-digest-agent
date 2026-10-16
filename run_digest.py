@@ -19,7 +19,6 @@ else:
 
 from logging_setup import setup_logging
 from sources.fetchers import fetch_all
-from sources.jobs import fetch_ai_jobs, format_jobs_context
 from sources.market_data import fetch_market_data, format_market_context
 from ranker import rank_items
 from digest import generate_digest
@@ -104,16 +103,6 @@ def main():
         logger.warning(f"Market data fetch failed: {e}")
         market_txt = "Market data unavailable."
 
-    # Hiring data is Skills Gap context only — keep it out of fetch_all()
-    # so job postings are never ranked into Top Stories.
-    console.print("  Fetching AI job postings...")
-    try:
-        jobs_txt = format_jobs_context(fetch_ai_jobs())
-    except Exception as e:
-        console.print(f"  [yellow]AI jobs fetch failed — {e}[/yellow]")
-        logger.warning(f"AI jobs fetch failed: {e}")
-        jobs_txt = "No recent AI job postings available."
-
     # ── Generate digest ────────────────────────────────────────────────────
     console.print("  Generating digest...")
     digest_text = generate_digest(
@@ -123,7 +112,6 @@ def main():
         market_context=market_txt,
         china_context=china_txt,
         frontier_context=frontier_txt,
-        jobs_context=jobs_txt,
     )
     logger.info("Digest generated.")
 

@@ -87,7 +87,7 @@ Keep retry budgets within the scheduled task's 10-minute `ExecutionTimeLimit` (`
 ## Project layout
 
 - `run_digest.py` — main entry point orchestrating a full run
-- `sources/` — fetchers for arXiv, TMLR, lab blogs, community sources, jobs, and market data
+- `sources/` — fetchers for arXiv, TMLR, lab blogs, community sources, and market data
 - `ranker.py` — scores fetched items with Grok
 - `digest.py` — generates the daily markdown digest
 - `weekly_rollup.py` — generates the Friday strategic rollup

@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 import weekly_rollup
-from weekly_rollup import collect_week_digests, _format_jobs_text
+from weekly_rollup import collect_week_digests
 
 
 class _FixedDate(date):
@@ -69,17 +69,3 @@ def test_collect_week_digests_uses_latest_run_of_the_day(tmp_path, monkeypatch):
 def test_collect_week_digests_empty_when_nothing_found(tmp_path, monkeypatch):
     _freeze(monkeypatch, date(2026, 8, 14))
     assert collect_week_digests(output_dir=str(tmp_path)) == []
-
-
-def test_format_jobs_text_empty():
-    assert _format_jobs_text([]) == "(none)"
-
-
-def test_format_jobs_text_formats_entries():
-    jobs = [{"company": "Acme AI", "title": "Inference Engineer",
-              "location": "Remote", "url": "https://acme/jobs/1"}]
-    text = _format_jobs_text(jobs)
-    assert "Acme AI" in text
-    assert "Inference Engineer" in text
-    assert "Remote" in text
-    assert "https://acme/jobs/1" in text

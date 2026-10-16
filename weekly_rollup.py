@@ -11,7 +11,7 @@ MODEL = "grok-4-fast"
 
 WEEKLY_PROMPT = """You are a senior AI research strategist writing a weekly intelligence report for a practitioner who monitors AI and agentic system trends.
 
-You have the daily digests from this week and the current AI industry job postings below. Synthesise them into a weekly rollup with these exact sections:
+You have the daily digests from this week below. Synthesise them into a weekly rollup with these exact sections:
 
 ---
 
@@ -29,14 +29,6 @@ Which engineering disciplines dominated this week and which were quiet. Note any
 ### Emerging Threads
 2–3 themes that appeared across multiple days and are building momentum. These are the ones to watch next week.
 
-### People Moves & Talent
-Summarise the AI industry hiring signal for this week based on the job postings below. Cover:
-- Which companies are actively hiring AI talent right now
-- Which role types are most in demand (e.g. inference engineers, alignment researchers, multimodal)
-- Notable location patterns (e.g. concentration in SF, Paris, remote-first)
-- 1–2 sentences on what the hiring pattern signals about where the industry is placing its bets
-If no job data is available, write "No new AI job postings detected this week."
-
 ### Weekly Interpretation
 A 150-word strategic read: what does this week's pattern mean for AI practitioners? What is accelerating, what is stalling, what should someone act on before it goes mainstream?
 
@@ -49,11 +41,6 @@ Keep the full rollup under 1000 words. Write for someone who has already read th
 
 Daily digests:
 {daily_digests}
-
----
-
-AI industry job postings this week:
-{jobs_text}
 """
 
 
@@ -79,21 +66,8 @@ def collect_week_digests(output_dir: str = "output") -> list[tuple[str, str]]:
     return found
 
 
-def _format_jobs_text(jobs: list[dict]) -> str:
-    if not jobs:
-        return "(none)"
-    lines = []
-    for j in jobs:
-        loc = f" — {j['location']}" if j.get("location") else ""
-        url = f" | {j['url']}" if j.get("url") else ""
-        lines.append(f"- [{j['company']}] {j['title']}{loc}{url}")
-    return "\n".join(lines)
-
-
 def generate_weekly_rollup(api_key: str, output_dir: str = "output") -> str:
     """Generate and save the weekly rollup. Returns the rollup text."""
-    from sources.jobs import fetch_ai_jobs
-
     week_digests = collect_week_digests(output_dir)
     if not week_digests:
         return ""
@@ -106,17 +80,10 @@ def generate_weekly_rollup(api_key: str, output_dir: str = "output") -> str:
         f"**{label}:**\n{content}" for label, content in week_digests
     )
 
-    try:
-        jobs = fetch_ai_jobs()
-    except Exception:
-        jobs = []
-    jobs_text = _format_jobs_text(jobs)
-
     client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
     prompt = WEEKLY_PROMPT.format(
         daily_digests=combined,
         week_start=week_start,
-        jobs_text=jobs_text,
     )
     response = generate_content_with_retry(
         client,

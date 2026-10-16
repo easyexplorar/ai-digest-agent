@@ -1,5 +1,5 @@
 """Shared retry/backoff wrapper for outbound HTTP calls made by the source
-fetchers (fetchers.py, community.py, lab_blogs.py, jobs.py).
+fetchers (fetchers.py, community.py, lab_blogs.py).
 
 Mirrors grok_utils.generate_content_with_retry: a transient network blip
 during an unattended run previously killed that fetcher's entire result
