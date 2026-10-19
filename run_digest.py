@@ -4,7 +4,7 @@ import os
 import sys
 import io
 
-from datetime import date
+from datetime import date, datetime
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.markdown import Markdown
@@ -33,6 +33,7 @@ from notify import save_digest, send_windows_notification
 from weekly_rollup import is_friday, generate_weekly_rollup
 from email_sender import send_digest_email, send_rollup_email, send_alert_email
 from retention import prune_output
+from run_guard import skip_reason, mark_sent
 
 load_dotenv()
 # legacy_windows=False: skip Rich's Win32 console API path, which crashes
@@ -42,8 +43,14 @@ console = Console(file=_utf8_stdout, legacy_windows=False) if _utf8_stdout else 
 logger = setup_logging()
 
 
-def main():
-    logger.info("=== Run started ===")
+def main(scheduled: bool = False):
+    if scheduled:
+        reason = skip_reason(datetime.now())
+        if reason:
+            logger.info(f"Scheduled run skipped — {reason}.")
+            return
+
+    logger.info("=== Run started ===" + (" (scheduled)" if scheduled else ""))
     api_key = os.getenv("XAI_API_KEY")
     if not api_key:
         console.print("[red]Error:[/red] XAI_API_KEY not set. Copy .env.example to .env and add your key.")
@@ -157,6 +164,8 @@ def main():
             )
             console.print(f"  Email: [green]daily digest sent to {email_to}[/green]")
             logger.info(f"Daily digest emailed to {email_to}.")
+            if scheduled:
+                mark_sent(datetime.now())
         except Exception as e:
             console.print(f"  Email: [red]daily digest failed — {e}[/red]")
             logger.error(f"Daily digest email failed: {e}")
@@ -234,7 +243,7 @@ def alert_crash(exc: Exception) -> None:
 
 if __name__ == "__main__":
     try:
-        main()
+        main(scheduled="--scheduled" in sys.argv[1:])
     except SystemExit:
         raise
     except Exception as e:

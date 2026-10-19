@@ -2,7 +2,7 @@
 
 Deletion is based on file mtime, not filename parsing, so it applies
 uniformly across the different naming schemes in output/ (digest_*.md,
-snapshot_*.json, urls_*.json, weekly_*.md). The default window (30 days)
+snapshot_*.json, urls_*.json, weekly_*.md, sent_*.marker). The default window (30 days)
 is well beyond the 3-5 day lookback tracker.py needs for trend/dedup, so
 pruning never removes a file the pipeline still reads.
 """
@@ -11,7 +11,7 @@ import os
 import time
 from pathlib import Path
 
-PRUNE_PATTERNS = ("digest_*.md", "snapshot_*.json", "urls_*.json", "weekly_*.md")
+PRUNE_PATTERNS = ("digest_*.md", "snapshot_*.json", "urls_*.json", "weekly_*.md", "sent_*.marker")
 
 
 def prune_output(output_dir: str = "output", retention_days: int | None = None, logger=None) -> list[Path]:
